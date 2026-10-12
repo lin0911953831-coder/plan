@@ -66,6 +66,7 @@ main{padding:14px 0 110px}
 .hero h1{font-size:22px;margin:4px 0 6px;letter-spacing:-.01em}
 .muted{color:var(--muted)} .small{font-size:13px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 @media (max-width:420px){.grid4{grid-template-columns:1fr 1fr}}
 .metric label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
@@ -218,11 +219,11 @@ const defPace = b => b >= 30 ? "fast" : b >= 25 ? "mid" : "soft";
 const JOBS = { sit: "Сидячая", stand: "На ногах", phys: "Физический труд" };
 const PLACES = { bar: "Дома с турником", none: "Дома без инвентаря" };
 const LEVELS = [null,
-  ["Старт с нуля", "Давно не двигался, от пола отжаться не получается, 30 минут ходьбы даются тяжело."],
-  ["Начинающий", "Давно не тренировался, отжимаюсь до 10 раз, не подтягиваюсь."],
-  ["Средний", "Тренируюсь иногда, отжимаюсь 10–25 раз, подтягиваюсь до 5 раз."],
-  ["Продвинутый", "Тренируюсь регулярно, 25–40 отжиманий, 5–12 подтягиваний."],
-  ["Атлет", "Больше 40 отжиманий и 12 подтягиваний, спокойно бегаю."]];
+  ["Старт с нуля", "Давно не двигался, от пола отжаться не получается, меньше 10 приседаний, 30 минут ходьбы даются тяжело."],
+  ["Начинающий", "Давно не тренировался, отжимаюсь до 10 раз, приседаю 10–25 раз, не подтягиваюсь."],
+  ["Средний", "Тренируюсь иногда, отжимаюсь 10–25 раз, приседаю 25–40 раз, подтягиваюсь до 5 раз."],
+  ["Продвинутый", "Тренируюсь регулярно, 25–40 отжиманий, 40–60 приседаний, 5–12 подтягиваний."],
+  ["Атлет", "Больше 40 отжиманий, 60 приседаний и 12 подтягиваний, спокойно бегаю."]];
 const HEALTH = { heart: "Болезни сердца или проблемы с давлением", diabetes: "Диабет или проблемы с сахаром", joints: "Боли или травмы суставов, спины", chronic: "Другие хронические болезни или постоянные лекарства" };
 const r5 = x => Math.round(x / 5) * 5;
 const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 12 || h > 14) ? b : c; };
@@ -1015,10 +1016,11 @@ function vSetup(){
   <section class="card"><h2 class="stp">2. Цель</h2>${seg("s-goal", GOALS, p.goal)}<div class="hint" id="s-goald"></div>
     <div id="s-pacew" style="margin-top:12px"><label class="hint" style="display:block;margin:0 0 6px">Темп похудения</label>${seg("s-pace", PACES, PACES[p.pace] ? p.pace : (S.profile.start && !p.v ? "fast" : defPace(p.startWeight && p.height ? bmiOf(p.startWeight, p.height) : 27)))}<div class="hint" id="s-paced"></div></div></section>
   <section class="card"><h2 class="stp">3. Физическая форма</h2>
-    <div class="tip" style="margin-top:0">Быстрый тест, можно пропустить: сколько раз подряд получится сделать с хорошей техникой?</div>
-    <div class="grid2" style="margin-top:10px">
-      <div>${lab("s-pu", "Отжиманий от пола")}<input id="s-pu" class="field sm" inputmode="numeric" autocomplete="off" placeholder="—" value="${esc(p.testPush != null ? p.testPush : "")}"></div>
-      <div>${lab("s-pl", "Подтягиваний")}<input id="s-pl" class="field sm" inputmode="numeric" autocomplete="off" placeholder="—" value="${esc(p.testPull != null ? p.testPull : "")}"></div>
+    <div class="tip" style="margin-top:0">Быстрый тест, можно пропустить: сколько раз подряд получится сделать с хорошей техникой? Приседания — без веса, до параллели бёдер с полом.</div>
+    <div class="grid3" style="margin-top:10px">
+      <div>${lab("s-pu", "Отжимания")}<input id="s-pu" class="field sm" inputmode="numeric" autocomplete="off" placeholder="—" value="${esc(p.testPush != null ? p.testPush : "")}"></div>
+      <div>${lab("s-pl", "Подтягивания")}<input id="s-pl" class="field sm" inputmode="numeric" autocomplete="off" placeholder="—" value="${esc(p.testPull != null ? p.testPull : "")}"></div>
+      <div>${lab("s-sq", "Приседания")}<input id="s-sq" class="field sm" inputmode="numeric" autocomplete="off" placeholder="—" value="${esc(p.testSquat != null ? p.testSquat : "")}"></div>
     </div>
     <div class="hint" id="s-sug"></div>
     <div class="lvls" id="s-level" style="margin-top:10px">${[1,2,3,4,5].map(l => `<button type="button" class="lvl ${+p.level === l ? "on" : ""}" data-lv="${l}">
@@ -1048,13 +1050,16 @@ function readSetup(){
   const sex = on("s-sex") || "m"; if (sex !== "f") { delete health.pregnant; delete health.bf; }
   return { sex, job: on("s-job") || "sit", goal: on("s-goal") || "lose", pace: on("s-pace") || "mid", eq: (() => { const q = {}; document.querySelectorAll("[data-eq]").forEach(x => { if (x.checked) q[x.dataset.eq] = true; }); return q; })(), level: lv ? +lv.dataset.lv : 2,
     age: parseNum(g("s-age").value), height: parseNum(g("s-h").value), startWeight: parseNum(g("s-w").value),
-    testPush: parseNum(g("s-pu").value), testPull: parseNum(g("s-pl").value), health, ack: !!(g("s-ack") && g("s-ack").checked), d: parseKey(g("s-d").value) };
+    testPush: parseNum(g("s-pu").value), testPull: parseNum(g("s-pl").value), testSquat: parseNum(g("s-sq").value), health, ack: !!(g("s-ack") && g("s-ack").checked), d: parseKey(g("s-d").value) };
 }
-function suggestLevel(pu, pl){
-  if (pu == null || Number.isNaN(pu)) return null;
-  let l = pu < 1 ? 1 : pu <= 10 ? 2 : pu <= 25 ? 3 : pu <= 40 ? 4 : 5;
-  if (pl != null && !Number.isNaN(pl)) { if (l >= 5 && pl < 12) l = 4; if (l >= 4 && pl < 5) l = 3; }
-  return l;
+function suggestLevel(pu, pl, sq){
+  const ok = x => x != null && !Number.isNaN(x) && x >= 0;
+  const lp = ok(pu) ? (pu < 1 ? 1 : pu <= 10 ? 2 : pu <= 25 ? 3 : pu <= 40 ? 4 : 5) : null;
+  const ls = ok(sq) ? (sq < 10 ? 1 : sq <= 25 ? 2 : sq <= 40 ? 3 : sq <= 60 ? 4 : 5) : null;
+  if (lp == null && ls == null) return null;
+  let l = lp != null && ls != null ? Math.floor((lp + ls) / 2) : (lp != null ? lp : ls);
+  if (ok(pl)) { if (l >= 5 && pl < 12) l = 4; if (l >= 4 && pl < 5) l = 3; }
+  return Math.max(1, l);
 }
 function setupLive(){
   const el = document.getElementById("s-prev"), v = document.getElementById("s-d"); if (!el || !v) return;
@@ -1064,7 +1069,7 @@ function setupLive(){
   document.getElementById("s-pacew").style.display = r.goal === "lose" ? "" : "none";
   document.getElementById("s-paced").textContent = PACE_DESC[r.pace] || "";
   document.getElementById("s-fem").style.display = r.sex === "f" ? "" : "none";
-  const sl = suggestLevel(r.testPush, r.testPull);
+  const sl = suggestLevel(r.testPush, r.testPull, r.testSquat);
   document.getElementById("s-sug").textContent = sl ? "По тесту подходит ступень " + sl + " «" + LEVELS[sl][0] + "». Выберите её или ту, что честнее про вас." : "";
   const src = { sex: r.sex, age: r.age, height: r.height, startWeight: r.startWeight, health: r.sex === "f" ? r.health : Object.assign({}, r.health, { pregnant: false, bf: false }), goal: r.goal, level: r.level };
   const list = (r.age > 0 && r.height > 0 && r.startWeight > 0) ? warnings(src) : warnings(Object.assign({}, src, { height: 0 }));
@@ -1082,6 +1087,7 @@ function saveSetup(){
     job: r.job, goal: r.goal, pace: r.pace, level: r.level, eq: r.eq, place: undefined, health: r.health, ack: r.ack, v: 2 };
   if (r.testPush != null && !Number.isNaN(r.testPush)) np.testPush = Math.round(r.testPush);
   if (r.testPull != null && !Number.isNaN(r.testPull)) np.testPull = Math.round(r.testPull);
+  if (r.testSquat != null && !Number.isNaN(r.testSquat)) np.testSquat = Math.round(r.testSquat);
   if (warnings(np).length && !r.ack) { err.textContent = "Отметьте в пункте 5, что проконсультируетесь с врачом."; document.getElementById("s-ackw").scrollIntoView({ block: "center" }); return; }
   S.profile = Object.assign({}, S.profile, np); PG = null; MP = null;
   S.setup = false; S.sel = clampI(todayIdx()); S.tab = "today";
