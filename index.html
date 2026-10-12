@@ -1018,14 +1018,14 @@ function vProgress(){
   <section class="card"><table class="tbl"><tr><th>Нед.</th><th>Ср. вес</th><th>Изм.</th><th>Шаги</th><th>Тренировки</th></tr>${rows}</table>
     <div class="hint">Тренировка засчитывается, когда отмечены все её пункты. Выполнено ${doneW} из ${planW} на сегодня.</div></section>
   ${profileCard()}
-  <section class="card"><div class="tip" style="margin-top:0">Только для взрослых 18+. Рекомендации носят ознакомительный и добровольный характер и не заменяют консультацию врача. <button type="button" class="hlink" style="margin:0;padding:0" data-terms>Условия использования</button></div></section>
+  <section class="card"><div class="tip" style="margin-top:0">Только для взрослых 18+. Рекомендации носят ознакомительный характер и не заменяют консультацию врача. <button type="button" class="hlink" style="margin:0;padding:0" data-terms>Условия использования</button></div></section>
   ${settingsCard(sw)}`;
 }
 
 const TERMS_HTML = `<div class="terms">
   <p><b>Только для взрослых.</b> Приложением могут пользоваться только люди, которым исполнилось 18 лет.</p>
   <p><b>Это не медицинская помощь.</b> «Здоровое тело» — информационное приложение. Его авторы не врачи, не диетологи и не тренеры. Планы питания и тренировок, калории, пульс и другие цифры рассчитываются по общим формулам и готовым шаблонам. Это примерные ориентиры, а не диагноз, не лечение и не индивидуальная рекомендация специалиста.</p>
-  <p><b>Добровольно и на свой риск.</b> Все рекомендации носят ознакомительный и добровольный характер. Вы сами решаете, следовать ли им, и сами отвечаете за своё здоровье и за последствия выполнения упражнений и изменения питания.</p>
+  <p><b>Решение за вами.</b> Рекомендации носят ознакомительный характер. Вы сами выбираете, каким из них следовать, и ориентируетесь на своё самочувствие, а при любых сомнениях советуетесь с врачом.</p>
   <p><b>Сначала врач.</b> Перед началом любой программы питания и тренировок рекомендуется проконсультироваться с врачом. Это обязательно при беременности и кормлении грудью, болезнях сердца и сосудов, давлении, диабете, болезнях суставов и спины, других хронических болезнях, приёме лекарств, а также при сильно повышенном или пониженном весе.</p>
   <p><b>Слушайте тело.</b> Немедленно прекратите занятие и обратитесь за медицинской помощью, если появились боль в груди, головокружение, сильная одышка, резкая боль в суставе или спине, слабость или другое плохое самочувствие.</p>
   <p><b>Без гарантий.</b> Результаты зависят от многих факторов и не гарантируются. Калорийность продуктов и расход энергии указаны приблизительно.</p>
@@ -1035,7 +1035,7 @@ function vTerms(){
   return `<section class="card hero"><div class="eyebrow">Перед началом</div><h1>Условия использования</h1>
     <div class="muted small">Прочитайте и подтвердите, чтобы продолжить.</div></section>
   <section class="card">${TERMS_HTML}
-    <label class="chk"><input type="checkbox" id="t-ok"><span><b>Мне исполнилось 18 лет. Я прочитал(а) условия, понимаю, что приложение не заменяет врача, и пользуюсь им добровольно, на свой риск.</b></span></label>
+    <label class="chk"><input type="checkbox" id="t-ok"><span><b>Мне исполнилось 18 лет. Я прочитал(а) условия и понимаю, что рекомендации носят ознакомительный характер и не заменяют консультацию врача.</b></span></label>
     <div class="hint" id="t-err" style="color:var(--fast)"></div>
     <div style="margin-top:10px"><button class="btn" data-acceptterms>Принимаю</button></div></section>`;
 }
@@ -1109,11 +1109,11 @@ function vSetup(){
   <section class="card"><h2 class="stp">6. Старт</h2>
     ${lab("s-d", "Дата старта")}<input id="s-d" class="field sm" type="date" value="${esc(d)}">
     <div class="hint" id="s-prev"></div>
-    <label class="chk" style="margin-top:10px"><input type="checkbox" id="s-terms" ${S.profile.terms ? "checked" : ""}><span>Мне исполнилось 18 лет. Я понимаю, что приложение не заменяет врача, и пользуюсь им добровольно, на свой риск. <button type="button" class="hlink" style="margin:0;padding:0" data-terms>Условия использования</button></span></label>
+    <label class="chk" style="margin-top:10px"><input type="checkbox" id="s-terms" ${S.profile.terms ? "checked" : ""}><span>Мне исполнилось 18 лет. Я понимаю, что рекомендации носят ознакомительный характер и не заменяют консультацию врача. <button type="button" class="hlink" style="margin:0;padding:0" data-terms>Условия использования</button></span></label>
     <div class="hint" id="s-err" style="color:var(--fast)"></div>
     <div class="pills" style="margin-top:12px;gap:8px"><button class="btn" data-setup="save">${first ? "Получить план" : "Сохранить"}</button>${first ? "" : '<button class="btn sec" data-setup="cancel">Отмена</button>'}</div></section>
   ${first ? setupExtra() : ""}
-  <section class="card"><div class="tip">Только для взрослых 18+. Приложение подбирает план по общим формулам и готовым программам, его авторы не врачи. Все рекомендации носят ознакомительный и добровольный характер и не заменяют консультацию врача, тренера и диетолога. <button type="button" class="hlink" style="margin:0;padding:0" data-terms>Условия использования</button></div></section>`;
+  <section class="card"><div class="tip">Только для взрослых 18+. Приложение подбирает план по общим формулам и готовым программам, его авторы не врачи. Рекомендации носят ознакомительный характер и не заменяют консультацию врача, тренера и диетолога. <button type="button" class="hlink" style="margin:0;padding:0" data-terms>Условия использования</button></div></section>`;
 }
 function readSetup(){
   const g = id => document.getElementById(id), on = id => { const b = document.querySelector("#" + id + " button.on"); return b ? b.dataset.v : null; };
