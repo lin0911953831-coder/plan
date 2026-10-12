@@ -5,14 +5,14 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Гром">
+<meta name="apple-mobile-web-app-title" content="Здоровое тело">
 <meta name="theme-color" content="#f4f5f2" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#111412" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
 </head><body>
-<title>Гром</title>
+<title>Здоровое тело</title>
 <style>
 :root{
   --bg:#f4f5f2; --card:#ffffff; --card2:#f0f2ee; --text:#18201b; --muted:#66706a; --line:#e2e6e0;
@@ -169,7 +169,7 @@ h2.stp{font-size:16px;margin-bottom:10px}
 </style>
 
 <div class="top"><div class="wrap">
-  <div class="brand"><b>Гром</b><span id="sync" class="sync"><i></i><span>Подключаюсь…</span></span></div>
+  <div class="brand"><b>Здоровое тело</b><span id="sync" class="sync"><i></i><span>Подключаюсь…</span></span></div>
   <div id="strip"></div>
 </div></div>
 <div class="wrap"><div id="banner"></div><main id="main"></main></div>
@@ -226,7 +226,7 @@ const LEVELS = [null,
 const HEALTH = { heart: "Болезни сердца или проблемы с давлением", diabetes: "Диабет или проблемы с сахаром", joints: "Боли или травмы суставов, спины", chronic: "Другие хронические болезни или постоянные лекарства" };
 const r5 = x => Math.round(x / 5) * 5;
 const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 12 || h > 14) ? b : c; };
-function prof(src){ const p = src || S.profile || {}; return Object.assign({ goal: "lose", level: 2, place: "bar", job: "sit" }, p, { health: Object.assign({}, p.health || {}) }); }
+function prof(src){ const p = src || S.profile || {}; return Object.assign({ goal: "lose", level: 2, job: "sit" }, p, { health: Object.assign({}, p.health || {}), eq: Object.assign({}, p.eq || (p.place === "none" ? {} : { bar: true })) }); }
 function zones(){ const a = +S.profile.age || 30, m = 220 - a, r = (lo, hi) => Math.round(m*lo) + "–" + Math.round(m*hi);
   return { max: m, walk: r(.6,.7), strength: r(.65,.8), fast: r(.8,.9), calm: r(.6,.7) }; }
 function lastWeight(){ for (let i = DAYS-1; i >= 0; i--) { const v = day(i).weight; if (v != null) return v; } return null; }
@@ -255,7 +255,7 @@ function effective(src){
   const walkOnly = ids.includes("preg") || ids.includes("heart");
   const noRun = b >= 30 || !!p.health.joints || walkOnly;
   const noJumps = level < 3 || noRun;
-  return { goal, level, place: p.place === "none" ? "none" : "bar", walkOnly, noRun, noJumps, bmi: b, changed: goal !== p.goal };
+  return { goal, level, eq: p.eq, walkOnly, noRun, noJumps, bmi: b, changed: goal !== p.goal };
 }
 function nutrition(){
   const p = prof(), e = effective(), w = curWeight(), fem = p.sex === "f";
@@ -418,6 +418,100 @@ const TPL = {
   bar: { A: [["pullBar",0],["squat",0],["push",0],["lunge",0],["coreBar",0],["plank",0]], B: [["pullBar",-1],["split",0],["pushN",0],["hinge",0],["rowBack",0],["cond",0]] },
   none: { A: [["rowTable",0],["squat",0],["push",0],["lunge",0],["coreFloor",0],["plank",0]], B: [["rowBack",0],["split",0],["pushN",0],["hinge",0],["coreFloor",1],["cond",0]] }
 };
+const B0 = { stool: { n: "Приседания на стул", t: "Сядьте на стул и встаньте без помощи рук. Колени смотрят в сторону носков." }, sq: { n: "Приседания", t: "Пятки на полу, спина прямая, опускайтесь до параллели бёдер с полом." } };
+Object.assign(LAD, {
+  squatDB: [B0.stool, B0.sq,
+    { n: "Гоблет-присед с гантелью 6–8 кг", t: "Гантель вертикально у груди, локти внутрь, спина прямая." },
+    { n: "Гоблет-присед с гантелью 10–14 кг", t: "Гантель у груди, опускайтесь до параллели и ниже, если колени не болят." },
+    { n: "Приседания с гантелями 2×12–16 кг", t: "Гантели в опущенных руках или на плечах, спина прямая." },
+    { n: "Приседания с паузой, гантели 2×16–20 кг", t: "Пауза 2 с внизу без расслабления." },
+    { n: "Пистолетик на стул с гантелью у груди", t: "На одной ноге садитесь на стул и вставайте, гантель у груди.", e: "leg" }],
+  squatBand: [B0.stool, B0.sq,
+    { n: "Приседания с лёгкой резинкой", t: "Встаньте на середину резинки, концы держите у плеч." },
+    { n: "Приседания со средней резинкой", t: "Встаньте на резинку, концы у плеч, спина прямая." },
+    { n: "Приседания с тяжёлой резинкой", t: "Встаньте на резинку, концы у плеч, спина прямая." },
+    { n: "Приседания с тяжёлой резинкой, пауза 2 с внизу", t: "Пауза в нижней точке без расслабления." },
+    { n: "Пистолетик на стул", t: "На одной ноге садитесь на стул и вставайте, вторая нога вытянута вперёд.", e: "leg" }],
+  lungeDB: [LAD.lunge[0], LAD.lunge[1], LAD.lunge[2],
+    { n: "Обратные выпады с гантелями 2×4–6 кг", t: "Гантели в опущенных руках, корпус вертикально.", e: "leg" },
+    { n: "Обратные выпады с гантелями 2×8–10 кг", t: "Гантели в опущенных руках, корпус вертикально.", e: "leg" },
+    { n: "Обратные выпады с гантелями 2×12–16 кг", t: "Гантели в опущенных руках, корпус вертикально.", e: "leg" }],
+  splitDB: [LAD.split[0], LAD.split[1], LAD.split[2],
+    { n: "Болгарские выпады с гантелями 2×4–6 кг", t: "Задняя нога на стуле, гантели в опущенных руках.", e: "leg" },
+    { n: "Болгарские выпады с гантелями 2×8–12 кг", t: "Задняя нога на стуле, гантели в опущенных руках.", e: "leg" },
+    { n: "Болгарские выпады с гантелями 2×14–16 кг", t: "Задняя нога на стуле, гантели в опущенных руках.", e: "leg" }],
+  hingeDB: [LAD.hinge[0],
+    { n: "Ягодичный мост с гантелью 8–12 кг на тазу", t: "Придерживайте гантель руками на тазу, наверху пауза 1 с." },
+    { n: "Румынская тяга с гантелями 2×6–8 кг", t: "Колени чуть согнуты, таз уводите назад, спина прямая, гантели скользят вдоль ног." },
+    { n: "Румынская тяга с гантелями 2×10–14 кг", t: "Таз назад, спина прямая, гантели вдоль ног." },
+    { n: "Румынская тяга с гантелями 2×16–20 кг", t: "Таз назад, спина прямая, гантели вдоль ног." },
+    { n: "Румынская тяга на одной ноге с гантелью 10–16 кг", t: "Наклон на одной ноге с прямой спиной, гантель в руке напротив опорной ноги.", e: "leg" }],
+  hingeBand: [LAD.hinge[0],
+    { n: "Ягодичный мост с резинкой над коленями", t: "Петля над коленями, разводите колени в стороны против резинки." },
+    { n: "Протяжка резинки между ног", t: "Резинка закреплена низко сзади, наклон вперёд с прямой спиной и разгибание за счёт ягодиц." },
+    { n: "Румынская тяга со средней резинкой", t: "Встаньте на резинку, концы в руках, наклон с прямой спиной." },
+    { n: "Румынская тяга с тяжёлой резинкой", t: "Встаньте на резинку, концы в руках, наклон с прямой спиной." },
+    { n: "Мост на одной ноге с резинкой над коленями", t: "Толкайтесь пяткой, колени не сводите.", e: "leg" }],
+  rowDB: [
+    { n: "Тяга гантели в наклоне 4–6 кг", t: "Опора рукой и коленом о стул, спина параллельна полу, локоть к поясу.", e: "side" },
+    { n: "Тяга гантели в наклоне 8–10 кг", t: "Опора о стул, локоть к поясу.", e: "side" },
+    { n: "Тяга гантели в наклоне 12–14 кг", t: "Опора о стул, локоть к поясу.", e: "side" },
+    { n: "Тяга гантели в наклоне 16–20 кг", t: "Опора о стул, локоть к поясу.", e: "side" },
+    { n: "Тяга гантели в наклоне 20–24 кг", t: "Опора о стул, локоть к поясу, без рывков.", e: "side" },
+    { n: "Тяга гантели с паузой 2 с наверху, 16–20 кг", t: "Задержка наверху, медленно вниз.", e: "side" }],
+  rowBand: [
+    { n: "Тяга лёгкой резинки к поясу сидя", t: "Сидя с прямыми ногами, резинка за стопами, тяните к поясу и сводите лопатки." },
+    { n: "Тяга средней резинки к поясу сидя", t: "Спина прямая, локти вдоль корпуса." },
+    { n: "Тяга тяжёлой резинки к поясу сидя", t: "Спина прямая, локти вдоль корпуса." },
+    { n: "Тяга тяжёлой резинки с паузой 2 с", t: "Задержка с сведёнными лопатками." },
+    { n: "Тяга резинки одной рукой", t: "Резинка закреплена на уровне пояса, тяните локоть назад.", e: "side" },
+    { n: "Тяга двух резинок к поясу с паузой", t: "Сложите две резинки, пауза 2 с." }],
+  vBand: [
+    { n: "Тяга лёгкой резинки сверху", t: "Закрепите резинку над дверью или на высоком крюке. Сидя или стоя на коленях тяните к груди, локти вниз." },
+    { n: "Тяга средней резинки сверху", t: "Локти вниз к рёбрам, лопатки сводите." },
+    { n: "Тяга тяжёлой резинки сверху", t: "Локти вниз к рёбрам, лопатки сводите." },
+    { n: "Тяга тяжёлой резинки сверху с паузой 2 с", t: "Задержка внизу, медленно обратно." },
+    { n: "Тяга резинки сверху одной рукой", t: "Тяните локоть к боку.", e: "side" },
+    { n: "Тяга двух резинок сверху", t: "Сложите две резинки, движение медленное." }],
+  pressDB: [
+    { n: "Жим гантелей сидя 2×2–3 кг", t: "Сидя с прямой спиной, гантели от плеч вверх, не прогибайте поясницу." },
+    { n: "Жим гантелей сидя 2×4–5 кг", t: "Спина прямая, гантели от плеч вверх." },
+    { n: "Жим гантелей сидя 2×6–8 кг", t: "Спина прямая, гантели от плеч вверх." },
+    { n: "Жим гантелей стоя 2×8–10 кг", t: "Пресс и ягодицы напряжены, не прогибайтесь." },
+    { n: "Жим гантелей стоя 2×12–14 кг", t: "Пресс и ягодицы напряжены, не прогибайтесь." },
+    { n: "Жим гантели одной рукой стоя 16–20 кг", t: "Корпус не наклоняйте в сторону.", e: "side" }],
+  pressBand: [
+    { n: "Жим лёгкой резинки над головой", t: "Встаньте на резинку, концы у плеч, выжимайте вверх." },
+    { n: "Жим средней резинки над головой", t: "Пресс напряжён, поясницу не прогибайте." },
+    { n: "Жим тяжёлой резинки над головой", t: "Пресс напряжён, поясницу не прогибайте." },
+    { n: "Жим тяжёлой резинки с паузой наверху", t: "Задержка 1–2 с на прямых руках." },
+    { n: "Жим резинки одной рукой", t: "Корпус не наклоняйте в сторону.", e: "side" },
+    { n: "Отжимания «уголком», ноги на стуле", t: "Таз высоко, опускайте голову к полу между ладонями." }],
+  pushBand: [LAD.push[0], LAD.push[1], LAD.push[2], LAD.push[3],
+    { n: "Отжимания с лёгкой резинкой за спиной", t: "Резинка через спину, концы под ладонями." },
+    { n: "Отжимания со средней резинкой за спиной", t: "Резинка через спину, концы под ладонями." },
+    { n: "Отжимания с тяжёлой резинкой за спиной", t: "Резинка через спину, концы под ладонями." }]
+});
+const EQ = { bar: "Турник", bands: "Резинки (ленты-эспандеры)", db: "Гантели" };
+const eqText = eq => { const a = Object.keys(EQ).filter(k => eq[k]).map(k => ({ bar: "турник", bands: "резинки", db: "гантели" })[k]); return a.length ? "Дома: " + a.join(", ") : "Без инвентаря"; };
+function slot(s, eq){
+  switch (s) {
+    case "vpull": return eq.bar ? "pullBar" : eq.bands ? "vBand" : "rowTable";
+    case "squat": return eq.db ? "squatDB" : eq.bands ? "squatBand" : "squat";
+    case "push": return eq.bands ? "pushBand" : "push";
+    case "lunge": return eq.db ? "lungeDB" : "lunge";
+    case "split": return eq.db ? "splitDB" : "split";
+    case "press": return eq.db ? "pressDB" : eq.bands ? "pressBand" : "pushN";
+    case "hinge": return eq.db ? "hingeDB" : eq.bands ? "hingeBand" : "hinge";
+    case "row": return eq.db ? "rowDB" : eq.bands ? "rowBand" : "rowBack";
+    case "core": return eq.bar ? "coreBar" : "coreFloor";
+    default: return s;
+  }
+}
+const TPL2 = { A: [["vpull",0],["squat",0],["push",0],["lunge",0],["core",0],["plank",0]],
+  Bbar: [["vpull",-1],["split",0],["press",0],["hinge",0],["row",0],["cond",0]],
+  B: [["row",0],["split",0],["press",0],["hinge",0],["coreFloor",1],["cond",0]] };
+
 const SCHEME = {
   lose: { sets: [2,3,3,4], reps: ["10–12","12–15","10–12","12–15"], rest: "60 с" },
   maintain: { sets: [2,3,3,4], reps: ["8–10","10–12","8–10","10–12"], rest: "75 с" },
@@ -439,7 +533,7 @@ let PG = null, PGkey = "";
 function program(){
   const e = effective(), key = JSON.stringify(e) + (S.profile.age || "");
   if (PG && PGkey === key) return PG;
-  const legacy = e.goal === "lose" && e.level === 2 && e.place === "bar" && !e.walkOnly;
+  const legacy = e.goal === "lose" && e.level === 2 && e.eq.bar && !e.eq.db && !e.eq.bands && !e.walkOnly;
   const cap = e.goal === "gain" ? 8 : e.goal === "maintain" ? 10 : 99;
   const steps = (e.level === 2 ? D.steps : STEPS[e.level]).map(x => Math.min(x, e.level === 1 ? Math.min(cap, 9) : cap));
   const ivs = Array.from({ length: 12 }, (_, k) => e.level === 2 ? D.int[k] : IVL[e.level][phaseOf(k+1)]);
@@ -447,7 +541,7 @@ function program(){
   let n = 0; const sIdx = layout.map(x => x === "S" ? n++ : -1);
   const dur = [30,45,50,55,60][e.level-1] + (e.goal === "gain" ? 10 : 0);
   const warm = e.level === 1 ? "5 минут: вращения в суставах по 10 раз, 10 приседаний на стул, 10 отжиманий от стены, минута ходьбы на месте."
-    : e.place === "none" ? "5 минут: вращения плечами, локтями, тазом и коленями по 10 раз, 15 приседаний, 10 отжиманий от стола, 20 шагов на месте с высоким подниманием коленей."
+    : !e.eq.bar ? "5 минут: вращения плечами, локтями, тазом и коленями по 10 раз, 15 приседаний, 10 отжиманий от стола, 20 шагов на месте с высоким подниманием коленей."
     : D.warmup;
   const ivMode = e.level === 1 || e.noRun || e.level === 2 ? "быстрая ходьба, ходьба в горку, подъём по лестнице или велосипед" : "бег трусцой, бег в горку или велосипед";
   PG = { e, legacy, steps, ivs, layout, sIdx, dur, warm, ivMode,
@@ -471,9 +565,9 @@ function strengthItems(P, w, L){
   if (P.legacy) return (L === "А" ? D.A : D.B).map((x, j) => ({ k: "t"+(j+1), ex: true,
     name: (w >= 9 && x.name === "Негативные подтягивания") ? "Подтягивания" : x.name,
     task: x.v[w-1], rest: x.rest, restSec: parseInt(x.rest, 10) || 0, tip: x.tip }));
-  const tpl = TPL[e.place][L === "А" ? "A" : "B"].map(x => e.goal === "gain" && x[0] === "cond" ? ["plank", 1] : x);
-  return tpl.map(([lad, off], j) => {
-    const arr = LAD[lad]; let idx = Math.max(0, Math.min(arr.length - 1, (e.level - 1) + off + (w >= 5 ? 1 : 0) + (w >= 9 ? 1 : 0)));
+  const tpl = (L === "А" ? TPL2.A : e.eq.bar ? TPL2.Bbar : TPL2.B).map(x => e.goal === "gain" && x[0] === "cond" ? ["plank", 1] : x);
+  return tpl.map(([sl, off], j) => {
+    const arr = LAD[slot(sl, e.eq)]; let idx = Math.max(0, Math.min(arr.length - 1, (e.level - 1) + off + (w >= 5 ? 1 : 0) + (w >= 9 ? 1 : 0)));
     while (idx > 0 && arr[idx].j && e.noJumps) idx--;
     const st = arr[idx], tk = exTask(st.k, st.e, w, e);
     return { k: "t"+(j+1), ex: true, name: st.n, task: tk.task, rest: tk.rest, restSec: parseInt(tk.rest, 10) || 0, tip: st.t };
@@ -682,7 +776,7 @@ function vToday(){
     <div class="eyebrow">Неделя ${w} · день ${i+1} из ${DAYS}${w === 6 || w === 12 ? " · разгрузка" : ""}</div>
     <h1>${WD[i%7]}, ${fmtDate(i)}</h1>
     <div class="muted small">${esc(program().focus[w-1])}</div>
-    <div class="pills"><span class="pill">${esc(GOALS[program().e.goal])}</span><span class="pill">Ступень ${program().e.level}</span><span class="pill">${esc(PLACES[program().e.place])}</span></div>
+    <div class="pills"><span class="pill">${esc(GOALS[program().e.goal])}</span><span class="pill">Ступень ${program().e.level}</span><span class="pill">${esc(eqText(program().e.eq))}</span></div>
   </section>
   ${!S.profile.v ? `<section class="card"><h2 style="font-size:16px">Новое: план под вашу цель и форму</h2><div class="tip">Теперь можно выбрать цель (похудеть, держать вес, набрать массу) и одну из 5 ступеней формы. Проверьте параметры, ваши записи сохранятся.</div><div style="margin-top:10px"><button class="btn" data-setup="open">Проверить параметры</button></div></section>` : ""}
   ${warnCard(warnings(), true)}
@@ -895,7 +989,7 @@ function profileCard(){
     <div class="kv" style="margin-top:10px"><b>Старт программы</b><span>${fmtDate(0)} ${dateAt(0).getFullYear()}</span>
     <b>Цель</b><span>${esc(GOALS[e.goal])}${e.goal === "lose" ? ", темп: " + esc((PACES[p.pace] || (p.v ? PACES[defPace(e.bmi)] : PACES.fast)).toLowerCase()) : ""}${e.changed ? " (изменена из-за здоровья)" : ""}</span>
     <b>Ступень формы</b><span>${e.level} · ${esc(LEVELS[e.level][0])}</span>
-    <b>Где</b><span>${esc(PLACES[e.place])}</span>
+    <b>Инвентарь</b><span>${esc(eqText(e.eq))}</span>
     <b>Пол, возраст</b><span>${esc(SEX[p.sex] || "—")}, ${esc(p.age || "—")}</span><b>Рост</b><span>${esc(p.height || "—")} см</span>
     <b>Стартовый вес</b><span>${esc(num(p.startWeight))} кг</span><b>Работа</b><span>${esc(JOBS[p.job] || "—")}</span>
     <b>Калории</b><span>${int(n.t)} ккал в день</span><b>Макс. пульс</b><span>${z.max} уд/мин</span></div></section>
@@ -929,8 +1023,10 @@ function vSetup(){
     <div class="hint" id="s-sug"></div>
     <div class="lvls" id="s-level" style="margin-top:10px">${[1,2,3,4,5].map(l => `<button type="button" class="lvl ${+p.level === l ? "on" : ""}" data-lv="${l}">
       <b>${l} · ${esc(LEVELS[l][0])}</b><span>${esc(LEVELS[l][1])}</span></button>`).join("")}</div></section>
-  <section class="card"><h2 class="stp">4. Где тренируетесь</h2>${seg("s-place", PLACES, p.place)}
-    <div class="hint">Для силовых пригодится рюкзак, в который можно положить бутылки с водой.</div></section>
+  <section class="card"><h2 class="stp">4. Что есть дома</h2>
+    <div class="tip" style="margin-top:0">Отметьте всё, что есть. Если ничего нет, программа будет с весом тела и рюкзаком.</div>
+    ${Object.keys(EQ).map(k => `<label class="chk"><input type="checkbox" data-eq="${k}" ${p.eq[k] ? "checked" : ""}><span>${esc(EQ[k])}</span></label>`).join("")}
+    <div class="hint">Гантели лучше разборные: вес нужно будет прибавлять. Резинки удобнее набором из 3–5 штук разной жёсткости. Без гантелей пригодится рюкзак, в который можно положить бутылки с водой.</div></section>
   <section class="card"><h2 class="stp">5. Здоровье</h2>
     <div class="tip" style="margin-top:0">Отметьте, если что-то из этого про вас. От ответов зависят калории и нагрузка.</div>
     <div id="s-fem" style="${p.sex === "f" ? "" : "display:none"}">${chk("pregnant", "Беременность")}${chk("bf", "Кормлю грудью")}</div>
@@ -950,7 +1046,7 @@ function readSetup(){
   const lv = document.querySelector("#s-level .lvl.on"), health = {};
   document.querySelectorAll("[data-h]").forEach(x => { if (x.checked) health[x.dataset.h] = true; });
   const sex = on("s-sex") || "m"; if (sex !== "f") { delete health.pregnant; delete health.bf; }
-  return { sex, job: on("s-job") || "sit", goal: on("s-goal") || "lose", pace: on("s-pace") || "mid", place: on("s-place") || "bar", level: lv ? +lv.dataset.lv : 2,
+  return { sex, job: on("s-job") || "sit", goal: on("s-goal") || "lose", pace: on("s-pace") || "mid", eq: (() => { const q = {}; document.querySelectorAll("[data-eq]").forEach(x => { if (x.checked) q[x.dataset.eq] = true; }); return q; })(), level: lv ? +lv.dataset.lv : 2,
     age: parseNum(g("s-age").value), height: parseNum(g("s-h").value), startWeight: parseNum(g("s-w").value),
     testPush: parseNum(g("s-pu").value), testPull: parseNum(g("s-pl").value), health, ack: !!(g("s-ack") && g("s-ack").checked), d: parseKey(g("s-d").value) };
 }
@@ -983,7 +1079,7 @@ function saveSetup(){
   if (!r.d) bad.push("дату старта");
   if (bad.length) { err.textContent = "Проверьте: " + bad.join(", ") + "."; return; }
   const np = { sex: r.sex, age: Math.round(r.age), height: Math.round(r.height), startWeight: Math.round(r.startWeight * 10) / 10, start: ymd(mondayOf(r.d)),
-    job: r.job, goal: r.goal, pace: r.pace, level: r.level, place: r.place, health: r.health, ack: r.ack, v: 2 };
+    job: r.job, goal: r.goal, pace: r.pace, level: r.level, eq: r.eq, place: undefined, health: r.health, ack: r.ack, v: 2 };
   if (r.testPush != null && !Number.isNaN(r.testPush)) np.testPush = Math.round(r.testPush);
   if (r.testPull != null && !Number.isNaN(r.testPull)) np.testPull = Math.round(r.testPull);
   if (warnings(np).length && !r.ack) { err.textContent = "Отметьте в пункте 5, что проконсультируетесь с врачом."; document.getElementById("s-ackw").scrollIntoView({ block: "center" }); return; }
@@ -995,23 +1091,23 @@ document.addEventListener("input", e => { if (e.target.closest && e.target.close
 document.addEventListener("change", e => { if (e.target.matches && e.target.matches("[data-h], #s-ack")) setupLive(); });
 
 /* ---------- steps from Apple Health via Shortcuts ---------- */
-const SHORTCUT = "Гром шаги";
+const SHORTCUT = "Шаги для Здорового тела";
 function healthHelp(){
   return `<div class="tip">Сайты на iPhone не могут читать «Здоровье» напрямую, поэтому шаги передаёт быстрая команда. Настраивается один раз:</div>
   <ol class="small" style="margin:8px 0 0;padding-left:20px;line-height:1.55">
     <li>Откройте приложение «Команды» → «+». Назовите команду <b>${SHORTCUT}</b> (именно так).</li>
     <li>Добавьте действие <b>«Найти образцы здоровья»</b>: тип «Шаги», фильтр «Дата начала» — «Сегодня».</li>
     <li>Добавьте <b>«Вычислить статистику»</b> → «Сумма» для найденных образцов.</li>
-    <li>Добавьте <b>«Текст»</b> и впишите: <b>GROM</b>, пробел, переменная «Статистика», пробел, переменная «Текущая дата» с форматом «Свой»: <b>yyyy-MM-dd</b>.</li>
+    <li>Добавьте <b>«Текст»</b> и впишите: <b>ШАГИ</b>, пробел, переменная «Статистика», пробел, переменная «Текущая дата» с форматом «Свой»: <b>yyyy-MM-dd</b>.</li>
     <li>Добавьте <b>«Скопировать в буфер обмена»</b>. Сохраните команду и один раз запустите её, разрешив доступ к «Здоровью».</li>
   </ol>
-  <div class="tip">Как пользоваться: нажмите «Из «Здоровья»» — откроется команда. Вернитесь в «Гром» и нажмите кнопку ещё раз: шаги подставятся сами. Если носите Apple Watch, шаги с часов и телефона могут сложиться дважды — тогда в шаге 2 добавьте фильтр «Источник» — ваш iPhone.</div>`;
+  <div class="tip">Как пользоваться: нажмите «Из «Здоровья»» — откроется команда. Вернитесь в приложение и нажмите кнопку ещё раз: шаги подставятся сами. Если носите Apple Watch, шаги с часов и телефона могут сложиться дважды — тогда в шаге 2 добавьте фильтр «Источник» — ваш iPhone.</div>`;
 }
 let healthAsked = 0;
 async function healthSteps(){
   let txt = "";
   try { if (navigator.clipboard && navigator.clipboard.readText) txt = await navigator.clipboard.readText(); } catch (e) {}
-  const m = /GROM\s+([\d\s.,]+?)\s*(\d{4}-\d{2}-\d{2})?\s*$/i.exec((txt || "").trim());
+  const m = /(?:GROM|ШАГИ)\s+([\d\s.,]+?)\s*(\d{4}-\d{2}-\d{2})?\s*$/i.exec((txt || "").trim());
   if (m) {
     const v = Math.round(parseFloat(m[1].replace(/\s/g, "").replace(",", "."))), k = m[2], i = k ? idxOfKey(k) : clampI(todayIdx());
     if (v >= 0 && v < 100000 && i >= 0 && i < DAYS) {
