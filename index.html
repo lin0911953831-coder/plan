@@ -154,6 +154,18 @@ svg.chart{width:100%;height:auto;display:block}
 .wkrow{display:grid;grid-template-columns:34px 1fr auto;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:14px;width:100%;text-align:left}
 .wkrow:first-child{border-top:0}
 .wkrow.sel b{color:var(--accent)}
+h2.stp{font-size:16px;margin-bottom:10px}
+.lvls{display:flex;flex-direction:column;gap:8px}
+.lvl{display:flex;flex-direction:column;gap:2px;text-align:left;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card2)}
+.lvl span{font-size:13px;color:var(--muted)} .lvl.on{border-color:var(--accent);background:var(--accent-soft)} .lvl.on b{color:var(--accent)}
+.chk{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line);font-size:14px;cursor:pointer}
+.chk input{width:20px;height:20px;margin:0;flex:none;accent-color:var(--accent)}
+.warncard{border-color:var(--fast);background:var(--fast-soft)} .warncard h2{color:var(--fast)}
+.addrow{margin-top:10px} select.field{appearance:auto;font-size:15px}
+.hbtn{margin-top:8px;font-size:12px;font-weight:600;padding:5px 9px;border-radius:999px;background:var(--fast-soft);color:var(--fast)}
+.toast{position:fixed;left:16px;right:16px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:9;background:var(--text);color:var(--bg);padding:12px 14px;border-radius:14px;font-size:14px;opacity:0;transform:translateY(10px);transition:.2s;pointer-events:none;max-width:560px;margin:0 auto}
+.toast.on{opacity:1;transform:none}
+.xbtn{width:28px;height:28px;border-radius:8px;background:var(--card2);color:var(--muted);font-size:18px;line-height:1}
 </style>
 
 <div class="top"><div class="wrap">
@@ -198,80 +210,336 @@ try { const t = localStorage.getItem("pp_tab"); if (t && ["today","food","train"
 const day = i => S.days[keyAt(i)] || {};
 
 /* ---------- personal numbers ---------- */
+const GOALS = { lose: "Похудеть", maintain: "Держать вес", gain: "Набрать массу" };
+const GOAL_DESC = { lose: "Дефицит калорий, больше кардио и шагов.", maintain: "Калории на уровне расхода, сила и выносливость.", gain: "Профицит калорий, больше силовых, меньше кардио." };
+const PACES = { soft: "Мягкий", mid: "Средний", fast: "Быстрый" };
+const PACE_DESC = { soft: "Дефицит 15%, около −0,3–0,5 кг в неделю. Легче держать.", mid: "Дефицит 20%, около −0,5–0,7 кг в неделю.", fast: "Дефицит 25–30%, около −0,7–1 кг в неделю. Только при заметном лишнем весе." };
+const defPace = b => b >= 30 ? "fast" : b >= 25 ? "mid" : "soft";
+const JOBS = { sit: "Сидячая", stand: "На ногах", phys: "Физический труд" };
+const PLACES = { bar: "Дома с турником", none: "Дома без инвентаря" };
+const LEVELS = [null,
+  ["Старт с нуля", "Давно не двигался, от пола отжаться не получается, 30 минут ходьбы даются тяжело."],
+  ["Начинающий", "Давно не тренировался, отжимаюсь до 10 раз, не подтягиваюсь."],
+  ["Средний", "Тренируюсь иногда, отжимаюсь 10–25 раз, подтягиваюсь до 5 раз."],
+  ["Продвинутый", "Тренируюсь регулярно, 25–40 отжиманий, 5–12 подтягиваний."],
+  ["Атлет", "Больше 40 отжиманий и 12 подтягиваний, спокойно бегаю."]];
+const HEALTH = { heart: "Болезни сердца или проблемы с давлением", diabetes: "Диабет или проблемы с сахаром", joints: "Боли или травмы суставов, спины", chronic: "Другие хронические болезни или постоянные лекарства" };
+const r5 = x => Math.round(x / 5) * 5;
+const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 12 || h > 14) ? b : c; };
+function prof(src){ const p = src || S.profile || {}; return Object.assign({ goal: "lose", level: 2, place: "bar", job: "sit" }, p, { health: Object.assign({}, p.health || {}) }); }
 function zones(){ const a = +S.profile.age || 30, m = 220 - a, r = (lo, hi) => Math.round(m*lo) + "–" + Math.round(m*hi);
   return { max: m, walk: r(.6,.7), strength: r(.65,.8), fast: r(.8,.9), calm: r(.6,.7) }; }
 function lastWeight(){ for (let i = DAYS-1; i >= 0; i--) { const v = day(i).weight; if (v != null) return v; } return null; }
-function kcalTarget(){
-  const p = S.profile; if (!p.age || !p.height || !p.startWeight) return null;
-  const w = lastWeight() || p.startWeight, f = p.sex === "f";
-  const tdee = (10*w + 6.25*p.height - 5*p.age + (f ? -161 : 5)) * 1.45;
-  return Math.max(f ? 1200 : 1500, Math.round(tdee * 0.65 / 50) * 50);
+function curWeight(){ return lastWeight() || S.profile.startWeight || 80; }
+function bmiOf(w, hcm){ const h = (hcm || S.profile.height || 175) / 100; return w / (h*h); }
+
+function warnings(src){
+  const p = prof(src), h = p.health, b = p.height && p.startWeight ? bmiOf(p.startWeight, p.height) : null, out = [];
+  if (p.age && p.age < 18) out.push(["minor", "Вам меньше 18 лет", "Программа рассчитана на взрослых. Перед началом обязательно покажитесь врачу (педиатру или спортивному врачу) и обсудите план с родителями. Худеть на дефиците калорий в этом возрасте без врача нельзя, поэтому калории выставлены на уровне нормы."]);
+  if (p.sex === "f" && h.pregnant) out.push(["preg", "Беременность", "Тренироваться и менять питание можно только с разрешения врача, который ведёт беременность. Дефицит калорий отключён, интервалы заменены спокойной ходьбой, нагрузка снижена до первой ступени. Упражнения лёжа на спине после первого триместра не выполняйте."]);
+  if (p.sex === "f" && h.bf) out.push(["bf", "Грудное вскармливание", "Согласуйте план с врачом. Дефицит калорий может снизить выработку молока, поэтому калории выставлены на уровне нормы."]);
+  if (h.heart) out.push(["heart", HEALTH.heart, "Начинайте только после консультации с кардиологом или терапевтом. Интервалы заменены ходьбой, вернуть их можно после разрешения врача."]);
+  if (h.diabetes) out.push(["diab", HEALTH.diabetes, "Питание и нагрузка влияют на сахар крови и дозы лекарств. Согласуйте план с эндокринологом и чаще проверяйте сахар в первые недели."]);
+  if (h.joints) out.push(["joints", HEALTH.joints, "Покажитесь врачу или реабилитологу. Прыжки и бег исключены. При острой боли упражнение сразу прекращайте."]);
+  if (h.chronic) out.push(["chronic", HEALTH.chronic, "Обсудите план с лечащим врачом: болезни и лекарства могут менять допустимую нагрузку и питание."]);
+  if (b && b < 18.5) out.push(["low", "Вес ниже нормы", "ИМТ меньше 18,5. Худеть вам не нужно, поэтому цель «похудеть» заменена на «держать вес». Обсудите питание с врачом."]);
+  if (b && b >= 35) out.push(["obese", "ИМТ 35 и выше", "При таком весе начните с консультации врача. Бег и прыжки исключены, интервалы делайте быстрой ходьбой или на велосипеде."]);
+  return out;
 }
-function kcalHint(){
-  const t = kcalTarget(); if (!t) return "";
-  const diff = t - 1817; if (Math.abs(diff) <= 150) return "Ваш ориентир около " + int(t) + " ккал в день: план подходит без изменений.";
-  const pct = Math.min(40, Math.round(Math.abs(diff) / 1140 * 100 / 5) * 5);
-  return "Ваш ориентир около " + int(t) + " ккал в день, а план рассчитан на 1 800. " + (diff < 0 ? "Уменьшите" : "Увеличьте") + " порции обеда и ужина примерно на " + pct + "%" + (pct >= 30 ? ", а лучше пересчитать план питания отдельно." : ".");
+function effective(src){
+  const p = prof(src), ids = warnings(src).map(x => x[0]), b = bmiOf(src ? p.startWeight : curWeight(), p.height);
+  let goal = GOALS[p.goal] ? p.goal : "lose", level = Math.max(1, Math.min(5, +p.level || 2));
+  if (goal === "lose" && (ids.includes("minor") || ids.includes("preg") || ids.includes("bf") || ids.includes("low"))) goal = "maintain";
+  if (goal === "gain" && (ids.includes("preg") || ids.includes("bf"))) goal = "maintain";
+  if (ids.includes("preg")) level = 1;
+  const walkOnly = ids.includes("preg") || ids.includes("heart");
+  const noRun = b >= 30 || !!p.health.joints || walkOnly;
+  const noJumps = level < 3 || noRun;
+  return { goal, level, place: p.place === "none" ? "none" : "bar", walkOnly, noRun, noJumps, bmi: b, changed: goal !== p.goal };
 }
+function nutrition(){
+  const p = prof(), e = effective(), w = curWeight(), fem = p.sex === "f";
+  const bmr = 10*w + 6.25*(p.height || 175) - 5*(p.age || 30) + (fem ? -161 : 5);
+  const tdee = bmr * (({ sit: 1.2, stand: 1.375, phys: 1.55 }[p.job] || 1.2) + 0.15);
+  let t = tdee, pct = 0;
+  if (e.goal === "lose") { const pace = PACES[p.pace] ? p.pace : (p.v ? defPace(e.bmi) : "fast");
+    pct = pace === "soft" ? 0.15 : pace === "mid" ? 0.20 : (e.bmi >= 27 ? 0.30 : 0.25); t = tdee - Math.min(1000, tdee * pct); }
+  else if (e.goal === "gain") { pct = 0.10; t = tdee * 1.10; }
+  t = Math.max(fem ? 1300 : 1500, Math.round(t / 10) * 10);
+  return { t, tdee: Math.round(tdee / 10) * 10, pct, e };
+}
+function nutritionText(){
+  const n = nutrition();
+  if (n.e.goal === "lose") return `Ваша норма ${int(n.t)} ккал в день: расход около ${int(n.tdee)} ккал минус дефицит ${Math.round((n.tdee - n.t) / n.tdee * 100)}%. Граммовки ниже уже пересчитаны под вас.`;
+  if (n.e.goal === "gain") return `Ваша норма ${int(n.t)} ккал в день: расход около ${int(n.tdee)} ккал плюс 10% на набор массы. Граммовки ниже уже пересчитаны под вас.`;
+  return `Ваша норма ${int(n.t)} ккал в день, на уровне расхода. Граммовки ниже уже пересчитаны под вас.`;
+}
+
+/* ---------- personal meal plan ---------- */
+const INGR = [[/куриное филе/i,113,23.6,"m"],[/бедра/i,135,19,"m"],[/фарш из индейки/i,160,19,"m"],[/фарш говяжий/i,200,18,"m"],[/говядина/i,158,21,"m"],[/минтая|трески/i,75,16.5,"m"],
+  [/гречка/i,330,12.6,"g"],[/рис/i,344,6.7,"g"],[/булгур/i,342,12.3,"g"],[/овощи/i,35,2.5,"v"],[/фасоль/i,99,6.7,"v"],[/томатная паста/i,100,4.8,"v"],[/томаты/i,20,1.1,"v"],
+  [/лук/i,41,1.4,"v"],[/морковь/i,35,1.3,"v"],[/капуста/i,28,1.8,"v"],[/перец/i,27,1.3,"v"],[/шампиньоны/i,27,4.3,"v"],[/сметана/i,119,2.7,"o"],[/масло/i,899,0,"o"]];
+function scaleDish(d, fc, mcap){
+  const info = d.ing.map(r => { const m = INGR.find(x => x[0].test(r[0])) || [null, 50, 1, "v"]; return { n: r[0], g: r[1], k: m[1], p: m[2], c: m[3] }; });
+  const fm = Math.max(0.5, Math.min(1.2, fc, mcap || 9)), fv = Math.max(0.7, Math.min(1.3, fc)), fo = Math.max(0.6, Math.min(1.5, fc));
+  let non = 0, gr = 0, base = 0;
+  info.forEach(x => { const kk = x.g * x.k / 100; base += kk; if (x.c === "g") gr += kk; else non += kk * (x.c === "m" ? fm : x.c === "o" ? fo : fv); });
+  const fg = gr ? Math.max(0.4, Math.min(3, (base * fc - non) / gr)) : 1;
+  const ing = info.map(x => { const f = x.c === "m" ? fm : x.c === "g" ? fg : x.c === "o" ? fo : fv;
+    const g = x.c === "o" ? Math.max(1, Math.round(x.g * f)) : Math.max(5, r5(x.g * f)); return [x.n, g, g * 7, x.k, x.p]; });
+  return { name: d.name, how: d.how, kcal: Math.round(ing.reduce((s, r) => s + r[1] * r[3] / 100, 0)), prot: ing.reduce((s, r) => s + r[1] * r[4] / 100, 0), ing };
+}
+let MP = null, MPkey = "";
+function mealPlan(){
+  const N = nutrition(), w = curWeight(), key = N.t + "|" + N.e.goal + "|" + w;
+  if (MP && MPkey === key) return MP;
+  const T = N.t, f = T / 1817, h = (S.profile.height || 175) / 100;
+  const protW = Math.min(w, 30 * h * h) * ({ lose: 2.0, maintain: 1.6, gain: 1.8 }[N.e.goal] || 1.8), mcap = protW / 160, fp = Math.min(f, mcap * 1.2);
+  const eggs = Math.max(2, Math.min(5, Math.round(3 * fp))), curd = Math.max(100, Math.min(300, Math.round(200 * fp / 25) * 25));
+  const bk = Math.round(eggs * 55 * 1.57) + 27, bp = eggs * 55 * 0.127 + 1.35;
+  const ck = Math.round(curd * 1.21) + 71, cp = curd * 0.17 + 0.6;
+  const extras = [];
+  if ((N.e.goal === "gain" && T > 2400) || T > 2600) extras.push({ k: "x1", time: "14:30", title: "Перекус для набора", kcal: 444, prot: 15.3, lines: [["Хлеб цельнозерновой", "60 г"], ["Арахисовая паста", "30 г"], ["Банан", "120 г"]] });
+  if ((N.e.goal === "gain" && T > 3000) || T > 3100) extras.push({ k: "x2", time: "21:00", title: "Поздний перекус", kcal: 265, prot: 15, lines: [["Кефир 2,5%", "500 мл"]] });
+  const fixed = bk + 80 + ck + extras.reduce((s, x) => s + x.kcal, 0);
+  const weeks = D.dishes.map(dw => { const fc = Math.max(0.6, Math.min(1.8, (T - fixed) / (dw.lunch.kcal + dw.dinner.kcal)));
+    return { lunch: scaleDish(dw.lunch, fc, mcap), dinner: scaleDish(dw.dinner, fc, mcap) }; });
+  const oats = r5(60 * f), acurd = Math.max(100, Math.round(150 * fp / 25) * 25);
+  const alt = { kcal: Math.round(oats * 3.52 + acurd * 1.21 + 114), prot: oats * 0.123 + acurd * 0.17 + 1.8,
+    lines: [["Овсяные хлопья на воде (вес сухих)", oats + " г"], ["Творог 5%", acurd + " г"], ["Банан", "120 г"], ["Чай или кофе без сахара", "250 мл"]] };
+  const wf = Math.max(1300, Math.min(2400, w * 19)) / 1800, ml = x => Math.max(150, Math.round(x * wf / 50) * 50);
+  const buy = [["Яйца", eggs * 7 + " шт."], ["Огурцы или помидоры", "1050 г"], ["Фрукты (яблоки, груши, апельсины)", "2240 г"], ["Творог 5%", curd * 7 + " г"]];
+  if (extras.length) buy.push(["Хлеб цельнозерновой", "420 г"], ["Арахисовая паста", "210 г"], ["Бананы", "840 г"]);
+  if (extras.length > 1) buy.push(["Кефир 2,5%", "3,5 л"]);
+  buy.push(["Чай или кофе, соль, специи (паприка, чеснок, зира, перец), масло", ""]);
+  MP = { T, protW, eggs, curd, bk, bp, ck, cp, extras, weeks, alt, ml, buy, N }; MPkey = key; return MP;
+}
+
+/* ---------- personal training program ---------- */
+const LAD = {
+  pullBar: [
+    { n: "Вис на перекладине", t: "Хват чуть шире плеч, плечи опущены вниз, тело не раскачивается.", k: "time" },
+    { n: "Подтягивания лопатками", t: "В висе на прямых руках опустите плечи вниз и сведите лопатки: тело поднимется на 3–5 см. Готовит к подтягиваниям." },
+    { n: "Негативные подтягивания", t: "Встаньте со стула в верхнюю точку (подбородок над перекладиной) и опускайтесь медленно до прямых рук.", k: "neg" },
+    { n: "Подтягивания и негативные", t: "Сначала 1–2 попытки обычного подтягивания, затем негативные со стула.", k: "mix" },
+    { n: "Подтягивания", t: "Подбородок над перекладиной, вниз до прямых рук, без раскачки.", k: "max" },
+    { n: "Подтягивания с паузой 1 с наверху", t: "Задержитесь в верхней точке, опускайтесь подконтрольно.", k: "max" },
+    { n: "Подтягивания с рюкзаком 5 кг", t: "Рюкзак плотно на спине, без раскачки.", k: "max" },
+    { n: "Подтягивания с рюкзаком 10 кг", t: "Рюкзак плотно на спине, без раскачки.", k: "max" }],
+  rowTable: [
+    { n: "Тяга полотенца у двери", t: "Перекиньте полотенце через ручку закрытой двери, которая открывается от вас. Держась за концы, отклонитесь назад и подтягивайте грудь к двери." },
+    { n: "Тяга полотенца у двери, стопы ближе к двери", t: "Чем ближе стопы к двери и ниже корпус, тем тяжелее." },
+    { n: "Тяга под столом, ноги согнуты", t: "Только под очень прочным столом, который не опрокинется. Лягте под край, возьмитесь и подтягивайте грудь к столешнице." },
+    { n: "Тяга под столом, ноги прямые", t: "Тело прямое от пяток до головы, грудь к столешнице." },
+    { n: "Тяга под столом с паузой 2 с наверху", t: "Сведите лопатки в верхней точке." },
+    { n: "Тяга под столом, ноги на стуле", t: "Тело параллельно полу, самый тяжёлый вариант." }],
+  rowBack: [
+    { n: "Тяга рюкзака 3–5 кг в наклоне", t: "Опора рукой и коленом о стул, спина параллельна полу. Тяните локоть к поясу, не разворачивая корпус.", e: "side" },
+    { n: "Тяга рюкзака 6–8 кг в наклоне", t: "Опора рукой и коленом о стул, локоть к поясу.", e: "side" },
+    { n: "Тяга рюкзака 10 кг в наклоне", t: "Опора рукой и коленом о стул, локоть к поясу.", e: "side" },
+    { n: "Тяга рюкзака 12 кг в наклоне", t: "Опора рукой и коленом о стул, локоть к поясу.", e: "side" },
+    { n: "Тяга рюкзака 15 кг в наклоне", t: "Опора рукой и коленом о стул, локоть к поясу.", e: "side" },
+    { n: "Тяга рюкзака 15 кг, опускание 3 с", t: "Медленно опускайте рюкзак, спина неподвижна.", e: "side" }],
+  squat: [
+    { n: "Приседания на стул", t: "Сядьте на стул и встаньте без помощи рук. Колени смотрят в сторону носков." },
+    { n: "Приседания", t: "Пятки на полу, спина прямая, опускайтесь до параллели бёдер с полом." },
+    { n: "Приседания с паузой 2 с внизу", t: "Пауза в нижней точке без расслабления." },
+    { n: "Приседания с рюкзаком 5–8 кг", t: "Рюкзак с бутылками воды на спине или у груди." },
+    { n: "Приседания с рюкзаком 10–15 кг", t: "Рюкзак с бутылками воды на спине или у груди." },
+    { n: "Пистолетик на стул", t: "На одной ноге садитесь на стул и вставайте, вторая нога вытянута вперёд.", e: "leg" },
+    { n: "Пистолетик с опорой рукой", t: "Придерживайтесь за дверной косяк и опускайтесь на одной ноге как можно ниже.", e: "leg" }],
+  lunge: [
+    { n: "Шаги на ступеньку", t: "Поднимайтесь на устойчивую ступеньку или низкий табурет, держась за стену.", e: "leg" },
+    { n: "Обратные выпады с опорой о стену", t: "Шаг назад, рука на стене для равновесия, корпус вертикально.", e: "leg" },
+    { n: "Обратные выпады", t: "Шаг назад, переднее колено над стопой, заднее почти касается пола.", e: "leg" },
+    { n: "Обратные выпады с рюкзаком 5–8 кг", t: "Корпус вертикально, рюкзак на спине.", e: "leg" },
+    { n: "Обратные выпады с рюкзаком 10–12 кг", t: "Корпус вертикально, рюкзак на спине.", e: "leg" },
+    { n: "Выпады в прыжке", t: "Мягкое приземление, колено не заваливается внутрь.", e: "leg", j: 1 }],
+  split: [
+    { n: "Выпады на месте с опорой", t: "Ноги в широком шаге, опускайтесь вниз и поднимайтесь, держась за стену.", e: "leg" },
+    { n: "Выпады на месте", t: "Ноги в широком шаге, заднее колено почти касается пола.", e: "leg" },
+    { n: "Болгарские выпады", t: "Задняя нога носком на стуле, вес на передней пятке.", e: "leg" },
+    { n: "Болгарские выпады с паузой внизу", t: "Пауза 1–2 с в нижней точке.", e: "leg" },
+    { n: "Болгарские выпады с рюкзаком 5–8 кг", t: "Задняя нога на стуле, рюкзак на спине.", e: "leg" },
+    { n: "Болгарские выпады с рюкзаком 10–12 кг", t: "Задняя нога на стуле, рюкзак на спине.", e: "leg" }],
+  hinge: [
+    { n: "Ягодичный мост", t: "Лёжа на спине, стопы у таза. Толкайтесь пятками, наверху сожмите ягодицы, поясницу не прогибайте." },
+    { n: "Ягодичный мост с паузой 2 с наверху", t: "Держите ягодицы напряжёнными в верхней точке." },
+    { n: "Ягодичный мост на одной ноге", t: "Вторая нога согнута и поднята, толкайтесь пяткой.", e: "leg" },
+    { n: "Мост на одной ноге с рюкзаком 5 кг на тазу", t: "Придерживайте рюкзак руками на тазу.", e: "leg" },
+    { n: "Мост на одной ноге, плечи на диване, рюкзак 8–10 кг", t: "Лопатки на краю дивана, амплитуда больше.", e: "leg" },
+    { n: "Румынская тяга на одной ноге с рюкзаком 10 кг", t: "Наклон вперёд на одной ноге с прямой спиной, рюкзак в руке напротив опорной ноги.", e: "leg" }],
+  push: [
+    { n: "Отжимания от стены", t: "Ладони на стене на уровне груди, тело прямое." },
+    { n: "Отжимания от стола", t: "Ладони на краю устойчивого стола, тело прямое." },
+    { n: "Отжимания от низкой опоры", t: "Скамья, диван или ступенька. Тело прямое, локти под 45° к корпусу." },
+    { n: "Отжимания от пола", t: "Тело прямое, локти под 45° к корпусу, грудь почти касается пола." },
+    { n: "Отжимания от пола, опускание 3 с", t: "Медленно вниз, быстро вверх." },
+    { n: "Отжимания с ногами на стуле", t: "Тело прямое, нагрузка смещается на верх груди и плечи." },
+    { n: "Отжимания лучником", t: "Руки широко, опускайтесь к одной руке, вторая выпрямлена в сторону.", e: "side" }],
+  pushN: [
+    { n: "Узкие отжимания от стены", t: "Ладони узко, локти скользят вдоль корпуса. Нагрузка на трицепс." },
+    { n: "Узкие отжимания от стола", t: "Ладони узко, локти вдоль корпуса." },
+    { n: "Узкие отжимания от низкой опоры", t: "Ладони узко, локти вдоль корпуса." },
+    { n: "Узкие отжимания от пола", t: "Ладони на ширине плеч или уже, локти вдоль корпуса." },
+    { n: "Отжимания «уголком»", t: "Таз высоко, тело буквой Λ, опускайте голову к полу между ладонями. Нагрузка на плечи." },
+    { n: "Отжимания «уголком», ноги на стуле", t: "Чем выше таз над плечами, тем тяжелее." },
+    { n: "Узкие отжимания с ногами на стуле", t: "Локти вдоль корпуса, тело прямое." }],
+  coreBar: [
+    { n: "Скручивания лёжа", t: "Поясница прижата к полу, поднимайте только лопатки." },
+    { n: "Подъём коленей лёжа", t: "Лёжа на спине подтягивайте колени к груди, поясница прижата." },
+    { n: "Подъём коленей в висе", t: "Без раскачки, колени к груди за счёт пресса, опускайте медленно." },
+    { n: "Подъём коленей в висе с паузой 1 с", t: "Задержка наверху, без раскачки." },
+    { n: "Подъём прямых ног в висе", t: "Ноги до параллели с полом, без раскачки." },
+    { n: "Подъём ног к перекладине", t: "Носки к перекладине, опускайте медленно." }],
+  coreFloor: [
+    { n: "Скручивания лёжа", t: "Поясница прижата к полу, поднимайте только лопатки." },
+    { n: "Подъём коленей лёжа", t: "Лёжа на спине подтягивайте колени к груди, поясница прижата." },
+    { n: "Обратные скручивания", t: "Поднимайте таз от пола, подтягивая колени к груди." },
+    { n: "Подъём прямых ног лёжа", t: "Поясница прижата к полу, опускайте ноги медленно." },
+    { n: "«Лодочка», удержание", t: "Лёжа на спине, поясница прижата, руки и ноги приподняты над полом.", k: "time" },
+    { n: "«Лодочка» с покачиванием", t: "Удерживайте форму лодочки и слегка покачивайтесь.", k: "time" }],
+  plank: [
+    { n: "Планка на коленях", t: "Локти под плечами, тело от колен до головы прямое.", k: "time" },
+    { n: "Планка", t: "Таз не провисает и не задран, пресс и ягодицы напряжены.", k: "time" },
+    { n: "Боковая планка", t: "Локоть под плечом, тело прямой линией.", k: "time", e: "side" },
+    { n: "Планка с подъёмом руки и ноги", t: "Поочерёдно поднимайте противоположные руку и ногу, таз неподвижен.", k: "time" },
+    { n: "Планка на прямых руках с касанием плеч", t: "Касайтесь ладонью противоположного плеча, не раскачивая таз.", k: "time" },
+    { n: "Длинная планка, локти впереди плеч", t: "Локти на 10–15 см впереди плеч, очень тяжёлый вариант.", k: "time" }],
+  cond: [
+    { n: "Марш на месте с высоким подниманием коленей", t: "Активно работайте руками, темп высокий, без прыжков.", k: "cond" },
+    { n: "«Скалолаз» с руками на диване", t: "Руки на диване, поочерёдно подтягивайте колени к груди.", k: "cond" },
+    { n: "«Скалолаз»", t: "Упор лёжа, колени к груди в быстром темпе, таз не поднимайте.", k: "cond" },
+    { n: "Берпи без прыжка", t: "Присед, шагом в упор лёжа, шагом обратно и встать.", k: "cond" },
+    { n: "Берпи", t: "Присед, прыжком в упор лёжа, обратно и выпрыгивание вверх.", k: "cond", j: 1 },
+    { n: "Берпи с отжиманием", t: "Как берпи, но в упоре лёжа одно отжимание.", k: "cond", j: 1 }]
+};
+const TPL = {
+  bar: { A: [["pullBar",0],["squat",0],["push",0],["lunge",0],["coreBar",0],["plank",0]], B: [["pullBar",-1],["split",0],["pushN",0],["hinge",0],["rowBack",0],["cond",0]] },
+  none: { A: [["rowTable",0],["squat",0],["push",0],["lunge",0],["coreFloor",0],["plank",0]], B: [["rowBack",0],["split",0],["pushN",0],["hinge",0],["coreFloor",1],["cond",0]] }
+};
+const SCHEME = {
+  lose: { sets: [2,3,3,4], reps: ["10–12","12–15","10–12","12–15"], rest: "60 с" },
+  maintain: { sets: [2,3,3,4], reps: ["8–10","10–12","8–10","10–12"], rest: "75 с" },
+  gain: { sets: [3,4,4,5], reps: ["6–8","8–10","6–8","8–10"], rest: "90 с" }
+};
+const IVL = { 1: [[5,1,2],[6,1,2],[6,1.5,1.5],[8,1.5,1.5]], 3: [[6,1,1.5],[8,1,1],[10,1,1],[10,1.5,1]], 4: [[8,1,1],[10,1,1],[10,1.5,1],[10,2,1]], 5: [[10,1,1],[10,1.5,1],[12,1.5,1],[12,2,1]] };
+const STEPS = { 1: [5,5,6,6,7,7,7,8,8,8,9,9], 3: [8,8,9,9,10,10,10,10,11,11,12,12], 4: [10,10,10,11,11,11,11,12,12,12,12,12], 5: [10,10,11,11,12,12,12,12,12,12,12,12] };
+const LAYOUT = { lose: ["S","I","S","W","S","I+","R"], maintain: ["S","W","S","I","S","A","R"], gain: ["S","S","W","S","S","A","R"] };
+const phaseOf = w => w <= 2 ? 0 : w <= 4 ? 1 : w <= 8 ? 2 : 3;
+const deload = w => w === 6 || w === 12;
+function genFocus(w, goal){
+  if (w === 6) return "Разгрузка: подходов на один меньше, вес и повторы прежние.";
+  if (w === 12) return "Разгрузка и итоги: сравните результаты с первой неделей.";
+  return ["Втягивание: главное техника, оставляйте 3 повтора в запасе.", "Полный объём: добавляйте 1–2 повтора каждую тренировку.",
+    "Новая ступень: упражнения стали сложнее, повторов снова меньше.", "Следующая ступень упражнений, запас 1–2 повтора."][phaseOf(w)]
+    + { lose: " Держите шаги и калории.", maintain: " Вес держите в пределах ±1 кг.", gain: " Съедайте весь план, даже без аппетита." }[goal];
+}
+let PG = null, PGkey = "";
+function program(){
+  const e = effective(), key = JSON.stringify(e) + (S.profile.age || "");
+  if (PG && PGkey === key) return PG;
+  const legacy = e.goal === "lose" && e.level === 2 && e.place === "bar" && !e.walkOnly;
+  const cap = e.goal === "gain" ? 8 : e.goal === "maintain" ? 10 : 99;
+  const steps = (e.level === 2 ? D.steps : STEPS[e.level]).map(x => Math.min(x, e.level === 1 ? Math.min(cap, 9) : cap));
+  const ivs = Array.from({ length: 12 }, (_, k) => e.level === 2 ? D.int[k] : IVL[e.level][phaseOf(k+1)]);
+  const layout = LAYOUT[e.goal].map(x => e.walkOnly && (x === "I" || x === "I+") ? (x === "I+" ? "A" : "W") : x);
+  let n = 0; const sIdx = layout.map(x => x === "S" ? n++ : -1);
+  const dur = [30,45,50,55,60][e.level-1] + (e.goal === "gain" ? 10 : 0);
+  const warm = e.level === 1 ? "5 минут: вращения в суставах по 10 раз, 10 приседаний на стул, 10 отжиманий от стены, минута ходьбы на месте."
+    : e.place === "none" ? "5 минут: вращения плечами, локтями, тазом и коленями по 10 раз, 15 приседаний, 10 отжиманий от стола, 20 шагов на месте с высоким подниманием коленей."
+    : D.warmup;
+  const ivMode = e.level === 1 || e.noRun || e.level === 2 ? "быстрая ходьба, ходьба в горку, подъём по лестнице или велосипед" : "бег трусцой, бег в горку или велосипед";
+  PG = { e, legacy, steps, ivs, layout, sIdx, dur, warm, ivMode,
+    focus: Array.from({ length: 12 }, (_, k) => legacy ? D.focus[k] : genFocus(k+1, e.goal)) };
+  PGkey = key; return PG;
+}
+function exTask(kind, each, w, e){
+  const ph = phaseOf(w), sc = SCHEME[e.goal];
+  const sets = Math.max(2, sc.sets[ph] - (e.level === 1 ? 1 : 0) - (deload(w) ? 1 : 0));
+  const side = each === "side" ? " на сторону" : each ? " на ногу" : "";
+  if (kind === "time") return { task: `${sets}×${[20,25,30,40][ph] + (e.level-1)*10} с${side}`, rest: "45 с" };
+  if (kind === "neg") return { task: `${sets}×3–5, опускание 4–5 с`, rest: "90 с" };
+  if (kind === "mix") return { task: `1–2 попытки обычных, затем ${sets}×3–4 негативных`, rest: "90 с" };
+  if (kind === "max") return { task: `${sets}×максимум, оставляйте 1–2 повтора в запасе`, rest: "90–120 с" };
+  if (kind === "cond") { const r = Math.max(2, [2,3,3,4][ph] + (e.level >= 4 ? 1 : 0) - (deload(w) ? 1 : 0)), wr = e.level <= 2 ? [20,40] : e.level === 3 ? [30,30] : [40,20];
+    return { task: `${r} ${plural(r, "раунд", "раунда", "раундов")}: ${wr[0]} с работа, ${wr[1]} с отдых`, rest: "По схеме" }; }
+  return { task: `${sets}×${sc.reps[ph]}${side}`, rest: sc.rest };
+}
+function strengthItems(P, w, L){
+  const e = P.e;
+  if (P.legacy) return (L === "А" ? D.A : D.B).map((x, j) => ({ k: "t"+(j+1), ex: true,
+    name: (w >= 9 && x.name === "Негативные подтягивания") ? "Подтягивания" : x.name,
+    task: x.v[w-1], rest: x.rest, restSec: parseInt(x.rest, 10) || 0, tip: x.tip }));
+  const tpl = TPL[e.place][L === "А" ? "A" : "B"].map(x => e.goal === "gain" && x[0] === "cond" ? ["plank", 1] : x);
+  return tpl.map(([lad, off], j) => {
+    const arr = LAD[lad]; let idx = Math.max(0, Math.min(arr.length - 1, (e.level - 1) + off + (w >= 5 ? 1 : 0) + (w >= 9 ? 1 : 0)));
+    while (idx > 0 && arr[idx].j && e.noJumps) idx--;
+    const st = arr[idx], tk = exTask(st.k, st.e, w, e);
+    return { k: "t"+(j+1), ex: true, name: st.n, task: tk.task, rest: tk.rest, restSec: parseInt(tk.rest, 10) || 0, tip: st.t };
+  });
+}
+const hhmm = m => Math.floor(m / 60) + ":" + pad(m % 60);
 
 /* ---------- plan ---------- */
 function plan(i){
-  const w = weekOf(i), dow = i % 7, order = w % 2 ? ["А","Б","А"] : ["Б","А","Б"];
-  if (dow === 0 || dow === 2 || dow === 4) {
-    const L = order[[0,2,4].indexOf(dow)], set = L === "А" ? D.A : D.B;
-    const items = [{ k: "t0", name: "Разминка", task: D.warmup }];
-    set.forEach((e, j) => items.push({ k: "t"+(j+1), ex: true,
-      name: (w >= 9 && e.name === "Негативные подтягивания") ? "Подтягивания" : e.name,
-      task: e.v[w-1], rest: e.rest, restSec: parseInt(e.rest, 10) || 0, tip: e.tip }));
-    items.push({ k: "t7", name: "Заминка", task: D.cooldown });
-    return { type: "strength", title: "Силовая " + L, time: "20:00–20:45", dur: "45 мин", pulse: zones().strength, inten: "7–8 из 10", items };
+  const P = program(), e = P.e, w = weekOf(i), dow = i % 7, type = P.layout[dow], z = zones();
+  if (type === "S") {
+    const L = e.goal === "gain" ? ["А","Б","А","Б"][P.sIdx[dow]] : (w % 2 ? ["А","Б","А"] : ["Б","А","Б"])[P.sIdx[dow]];
+    const items = [{ k: "t0", name: "Разминка", task: P.warm }].concat(strengthItems(P, w, L), [{ k: "t7", name: "Заминка", task: D.cooldown }]);
+    return { type: "strength", title: "Силовая " + L, time: "20:00–" + hhmm(20*60 + P.dur), dur: P.dur + " мин", pulse: z.strength,
+      inten: e.level === 1 ? "6–7 из 10" : "7–8 из 10", items };
   }
-  if (dow === 1 || dow === 5) {
-    const [r, f, s] = D.int[w-1], total = 10 + r * (f + s);
+  if (type === "I" || type === "I+") {
+    const [r, f, s] = P.ivs[w-1], total = 10 + r * (f + s), sat = dow === 5;
     const items = [
       { k: "t0", name: "Разминка, 5 минут", task: "Спокойная ходьба, круговые движения в суставах." },
-      { k: "t1", name: `${r} кругов: ${num(f)} мин быстро + ${num(s)} мин спокойно`,
-        task: `Быстро: пульс ${zones().fast}, говорить можно только отдельными словами. Спокойно: пульс ${zones().calm}, дыхание восстанавливается.` },
+      { k: "t1", name: `${r} ${plural(r, "круг", "круга", "кругов")}: ${num(f)} мин быстро + ${num(s)} мин спокойно`,
+        task: `Быстро: пульс ${z.fast}, говорить можно только отдельными словами. Спокойно: пульс ${z.calm}, дыхание восстанавливается.` },
       { k: "t2", name: "Заминка, 5 минут", task: "Спокойная ходьба и растяжка ног." }];
-    if (dow === 5) items.push({ k: "t3", name: "Длинная прогулка, 60 минут", task: "Можно заменить бассейном или велосипедом. Пульс " + zones().walk + "." });
-    return { type: "interval", title: dow === 5 ? "Интервалы и прогулка" : "Интервалы", time: dow === 1 ? "20:00–20:30" : "Днём",
-      dur: num(total) + " мин", pulse: zones().fast, inten: "8 на быстрых, 4 на спокойных", items, iv: { r, f, s, total } };
+    if (type === "I+") items.push({ k: "t3", name: "Длинная прогулка, 60 минут", task: "Можно заменить бассейном или велосипедом. Пульс " + z.walk + "." });
+    return { type: "interval", title: type === "I+" ? "Интервалы и прогулка" : "Интервалы", time: sat ? "Днём" : "20:00–" + hhmm(20*60 + Math.round(total)),
+      dur: num(total) + " мин", pulse: z.fast, inten: "8 на быстрых, 4 на спокойных", items, iv: { r, f, s, total }, mode: P.ivMode };
   }
-  if (dow === 3) return { type: "walk", title: "Ходьба", time: "В любое время", dur: "45–60 мин", pulse: zones().walk, inten: "3–4 из 10",
-    items: [{ k: "t0", name: "Ходьба 45–60 минут", task: "Спокойный темп, можно разбить на 2–3 прогулки. День восстановления." }] };
+  if (type === "W") { const d = e.level === 1 ? "30–40" : "45–60";
+    return { type: "walk", title: "Ходьба", time: "В любое время", dur: d + " мин", pulse: z.walk, inten: "3–4 из 10",
+      items: [{ k: "t0", name: `Ходьба ${d} минут`, task: "Спокойный темп, можно разбить на 2–3 прогулки. День восстановления." }] }; }
+  if (type === "A") return { type: "walk", title: "Активный отдых", time: "Днём", dur: "60 мин", pulse: z.walk, inten: "3–4 из 10",
+    items: [{ k: "t0", name: "Длинная прогулка, бассейн или велосипед, 60 минут", task: "Спокойный темп, пульс " + z.walk + "." }] };
   return { type: "rest", title: "Отдых", time: "", dur: "", items: [
     { k: "t0", name: "Лёгкая прогулка", task: "Без нагрузки, просто подвигаться." },
     { k: "t1", name: "Готовка на неделю", task: "Обеды и ужины на следующую неделю: рецепты и граммы во вкладке «Питание»." }] };
 }
-const stepGoal = i => D.steps[weekOf(i)-1] * 1000;
+const stepGoal = i => program().steps[weekOf(i)-1] * 1000;
 function trainDone(i){ const p = plan(i), t = day(i).train || {}; const n = p.items.filter(x => t[x.k]).length; return { n, of: p.items.length, full: n === p.items.length }; }
 
 function meals(i){
-  const w = weekOf(i), dw = D.dishes[(w-1) % 4], p = plan(i), alt = !!day(i).altBreakfast;
+  const w = weekOf(i), M = mealPlan(), dw = M.weeks[(w-1) % 4], p = plan(i), alt = !!day(i).altBreakfast, ml = M.ml;
   const L = [
-    { k: "m0", time: "7:00", water: true, title: "Вода", sub: "350 мл сразу после подъёма", ml: 350 },
-    alt ? { k: "m1", time: "7:30", title: "Завтрак (замена)", ml: 250, kcal: 507, prot: 34.7,
-            lines: [["Овсяные хлопья на воде (вес сухих)","60 г"],["Творог 5%","150 г"],["Банан","120 г"],["Чай или кофе без сахара","250 мл"]] }
-        : { k: "m1", time: "7:30", title: "Завтрак", ml: 250, kcal: 286, prot: 22.3,
-            lines: [["Яйца, 3 шт. (омлет или варёные)","165 г"],["Огурец или помидор","150 г"],["Чай или кофе без сахара","250 мл"]] },
-    { k: "m2", time: "10:30", water: true, title: "Вода", sub: "350 мл", ml: 350 },
-    { k: "m3", time: "10:30", title: "Перекус", kcal: 80, prot: 0.7, lines: [["Фрукт: яблоко, груша или апельсин","170 г"]] },
-    { k: "m4", time: "12:10", water: true, title: "Вода", sub: "250 мл за 20 минут до обеда", ml: 250 },
+    { k: "m0", time: "7:00", water: true, title: "Вода", sub: ml(350) + " мл сразу после подъёма", ml: ml(350) },
+    alt ? { k: "m1", time: "7:30", title: "Завтрак (замена)", ml: 250, kcal: M.alt.kcal, prot: M.alt.prot, lines: M.alt.lines }
+        : { k: "m1", time: "7:30", title: "Завтрак", ml: 250, kcal: M.bk, prot: M.bp,
+            lines: [[`Яйца, ${M.eggs} шт. (омлет или варёные)`, M.eggs * 55 + " г"], ["Огурец или помидор", "150 г"], ["Чай или кофе без сахара", "250 мл"]] },
+    { k: "m2", time: "10:30", water: true, title: "Вода", sub: ml(350) + " мл", ml: ml(350) },
+    { k: "m3", time: "10:30", title: "Перекус", kcal: 80, prot: 0.7, lines: [["Фрукт: яблоко, груша или апельсин", "170 г"]] },
+    { k: "m4", time: "12:10", water: true, title: "Вода", sub: ml(250) + " мл за 20 минут до обеда", ml: ml(250) },
     { k: "m5", time: "12:30", title: "Обед · контейнер А", dish: dw.lunch, kcal: dw.lunch.kcal, prot: dw.lunch.prot },
-    { k: "m6", time: "14:30", water: true, title: "Вода", sub: "300 мл", ml: 300 },
-    { k: "m7", time: "16:10", water: true, title: "Вода", sub: "250 мл за 20 минут до ужина", ml: 250 },
+    { k: "m6", time: "14:30", water: true, title: "Вода", sub: ml(300) + " мл", ml: ml(300) }]
+    .concat(M.extras.filter(x => x.k === "x1"), [
+    { k: "m7", time: "16:10", water: true, title: "Вода", sub: ml(250) + " мл за 20 минут до ужина", ml: ml(250) },
     { k: "m8", time: "16:30", title: "Ужин · контейнер Б", dish: dw.dinner, kcal: dw.dinner.kcal, prot: dw.dinner.prot },
-    { k: "m9", time: "18:30", water: true, title: "Вода", sub: "300 мл", ml: 300 },
-    { k: "m10", time: "19:30–20:00", title: "Вечерний приём", kcal: 313, prot: 34.6, lines: [["Творог 5%","200 г"],["Яблоко или ягоды","150 г"]] },
-  ];
+    { k: "m9", time: "18:30", water: true, title: "Вода", sub: ml(300) + " мл", ml: ml(300) },
+    { k: "m10", time: "19:30–20:00", title: "Вечерний приём", kcal: M.ck, prot: M.cp, lines: [["Творог 5%", M.curd + " г"], ["Яблоко или ягоды", "150 г"]] }]);
   if (p.type === "strength" || p.type === "interval")
-    L.push({ k: "m11", time: p.type === "strength" || i % 7 === 1 ? "20:00" : "На тренировке", water: true, title: "Вода на тренировке", sub: "450 мл небольшими глотками", ml: 450 });
-  return L;
+    L.push({ k: "m11", time: /^20/.test(p.time) ? "20:00" : "На тренировке", water: true, title: "Вода на тренировке", sub: "450 мл небольшими глотками", ml: 450 });
+  return L.concat(M.extras.filter(x => x.k === "x2"));
 }
+
 function foodTotals(i){
   const m = meals(i), c = day(i).meals || {}; const r = { kcal: 0, kcalPlan: 0, prot: 0, protPlan: 0, ml: 0, mlPlan: 0 };
   m.forEach(x => { r.kcalPlan += x.kcal || 0; r.protPlan += x.prot || 0; r.mlPlan += x.ml || 0;
     if (c[x.k]) { r.kcal += x.kcal || 0; r.prot += x.prot || 0; r.ml += x.ml || 0; } });
+  r.extra = extraFood(i).reduce((s, x) => s + (x.kcal || 0), 0); r.kcal += r.extra;
   return r;
 }
 const hasData = i => { const d = day(i); return d.weight != null || d.steps != null || Object.values(d.train || {}).some(Boolean) || Object.values(d.meals || {}).some(Boolean); };
@@ -392,7 +660,7 @@ const ICONS = {
   steps: '<path d="M8 3.5c1.9 0 2.8 2.3 2.8 5s-1 3.8-2.8 3.8S5.2 11.2 5.2 8.5 6.1 3.5 8 3.5zM6 15.2h4.2v1.6a2.1 2.1 0 0 1-4.2 0z"/><path d="M16 7.5c1.9 0 2.8 2.3 2.8 5s-1 3.8-2.8 3.8-2.8-1.1-2.8-3.8.9-5 2.8-5zM14 19.2h4.2"/>',
   progress: '<path d="M3 20h18M6 16l4-5 3 3 5-7"/><path d="M15 7h3v3"/>'
 };
-const TABS = [["today","Сегодня"],["food","Питание"],["train","Тренировки"],["steps","Шаги"],["progress","Прогресс"]];
+const TABS = [["today","Сегодня"],["food","Питание"],["train","Тренировки"],["steps","Активность"],["progress","Прогресс"]];
 function renderTabs(){
   document.getElementById("tabs").innerHTML = TABS.map(([k, l]) => `<button class="${S.tab === k ? "on" : ""}" data-tab="${k}"><svg viewBox="0 0 24 24">${ICONS[k]}</svg>${l}</button>`).join("");
 }
@@ -413,8 +681,11 @@ function vToday(){
     ${todayIdx() < 0 ? `<div class="pill o" style="margin-bottom:8px">Программа начнётся ${fmtDate(0)}</div>` : todayIdx() >= DAYS ? '<div class="pill g" style="margin-bottom:8px">Программа завершена</div>' : ""}
     <div class="eyebrow">Неделя ${w} · день ${i+1} из ${DAYS}${w === 6 || w === 12 ? " · разгрузка" : ""}</div>
     <h1>${WD[i%7]}, ${fmtDate(i)}</h1>
-    <div class="muted small">${esc(D.focus[w-1])}</div>
+    <div class="muted small">${esc(program().focus[w-1])}</div>
+    <div class="pills"><span class="pill">${esc(GOALS[program().e.goal])}</span><span class="pill">Ступень ${program().e.level}</span><span class="pill">${esc(PLACES[program().e.place])}</span></div>
   </section>
+  ${!S.profile.v ? `<section class="card"><h2 style="font-size:16px">Новое: план под вашу цель и форму</h2><div class="tip">Теперь можно выбрать цель (похудеть, держать вес, набрать массу) и одну из 5 ступеней формы. Проверьте параметры, ваши записи сохранятся.</div><div style="margin-top:10px"><button class="btn" data-setup="open">Проверить параметры</button></div></section>` : ""}
+  ${warnCard(warnings(), true)}
   <div class="grid2">
     <div class="card metric"><label for="f-w">Вес утром, кг</label>
       <input id="f-w" class="field" inputmode="decimal" autocomplete="off" placeholder="—" data-f="weight" data-i="${i}" value="${esc(num(d.weight))}">
@@ -422,7 +693,8 @@ function vToday(){
     <div class="card metric"><label for="f-s">Шаги</label>
       <input id="f-s" class="field" inputmode="numeric" autocomplete="off" placeholder="—" data-f="steps" data-i="${i}" value="${d.steps != null ? d.steps : ""}">
       <div class="bar ${d.steps != null && d.steps < g ? "warn" : ""}"><i style="width:${stepsPct}%"></i></div>
-      <div class="hint">Цель ${int(g)}${d.steps != null ? (d.steps >= g ? " · выполнено" : " · осталось " + int(g - d.steps)) : ""}</div></div>
+      <div class="hint">Цель ${int(g)}${d.steps != null ? (d.steps >= g ? " · выполнено" : " · осталось " + int(g - d.steps)) : ""}</div>
+      <button class="hbtn" data-health>♥ Из «Здоровья»</button></div>
   </div>
   <button class="card link" data-go="train">
     <div class="rowh"><div><div class="eyebrow">Тренировка</div><h2 style="margin-top:3px">${esc(p.title)}</h2></div>
@@ -438,16 +710,22 @@ function vToday(){
     <div class="bar water"><i style="width:${ft.ml/ft.mlPlan*100}%"></i></div>
     ${next}
     <span class="go">Открыть расписание →</span>
-  </button>`;
+  </button>
+  ${balanceCard(i)}`;
 }
 
 function dishBlock(dsh, showBuy){
   return `<table class="ing"><tr><th>Продукт</th><th class="n">На порцию</th>${showBuy ? '<th class="n">На неделю</th>' : ""}</tr>
     ${dsh.ing.map(r => `<tr><td>${esc(r[0])}</td><td class="n">${r[1]} г</td>${showBuy ? `<td class="n">${num(r[2] >= 1000 ? (r[2]/1000).toFixed(2).replace(/0$/, "") : r[2])} ${r[2] >= 1000 ? "кг" : "г"}</td>` : ""}</tr>`).join("")}</table>`;
 }
+function goalRules(){
+  const g = program().e.goal;
+  return D.rules.map(r => r[0] !== "Если вес стоит" ? r : g === "gain" ? ["Если вес не растёт", "Две недели без прибавки: добавьте по 20 г крупы в обед и ужин или ещё один перекус. Норма набора 0,25–0,5 кг в неделю."]
+    : g === "maintain" ? ["Если вес уходит", "Изменился больше чем на 1 кг за 2 недели: уменьшите или увеличьте гарнир на 20–30 г."] : r);
+}
 function vFood(){
   const i = S.sel, d = day(i), c = d.meals || {}, ft = foodTotals(i), m = meals(i), w = weekOf(i);
-  const cookW = (i % 7 === 6 && w < 12) ? w + 1 : w, dw = D.dishes[(cookW-1) % 4];
+  const cookW = (i % 7 === 6 && w < 12) ? w + 1 : w, MPl = mealPlan(), dw = MPl.weeks[(cookW-1) % 4];
   const items = m.map(x => {
     const on = !!c[x.k];
     let body = "";
@@ -469,10 +747,11 @@ function vFood(){
       <div class="stat"><small>Отмечено</small><b>${m.filter(x => c[x.k]).length}</b><small>из ${m.length}</small></div>
     </div>
     <div style="margin-top:12px" class="seg"><button class="${d.altBreakfast ? "" : "on"}" data-alt="0">Завтрак: яйца</button><button class="${d.altBreakfast ? "on" : ""}" data-alt="1">Замена: овсянка</button></div>
-    ${kcalHint() ? `<div class="hint">${esc(kcalHint())}</div>` : ""}
+    <div class="hint">${esc(nutritionText())}</div>
   </section>
   <section class="card"><div class="list">${items}</div>
     <div class="hint" style="margin-top:6px">После 21:30 только пара глотков воды при жажде.</div></section>
+  ${extraFoodCard(i)}
 
   <div class="sec-title">${cookW !== w ? "Готовка сегодня на неделю " + cookW : "Готовка на неделю " + w}</div>
   ${["lunch","dinner"].map(k => { const x = dw[k]; return `<section class="card">
@@ -482,8 +761,8 @@ function vFood(){
   <section class="card"><h2 style="font-size:16px">Раскладка и хранение</h2>
     <div class="tip">Каждого блюда 7 порций. Взвесьте всё готовое и разделите на 7 равных контейнеров. 3 контейнера в холодильник на пн–ср, 4 в морозилку. Вечером накануне перекладывайте контейнер из морозилки в холодильник. Стеклянный контейнер греть в микроволновке без крышки или с приоткрытой крышкой.</div></section>
   <section class="card"><h2 style="font-size:16px">Докупить к завтракам и перекусам на 7 дней</h2>
-    <table class="ing">${D.extras.map(r => `<tr><td>${esc(r[0])}</td><td class="n">${esc(r[1])}</td></tr>`).join("")}</table></section>
-  <section class="card"><details><summary>Правила питания</summary><div class="kv" style="margin-top:10px">${D.rules.map(r => `<b>${esc(r[0])}</b><span>${esc(r[1])}</span>`).join("")}</div></details></section>`;
+    <table class="ing">${MPl.buy.map(r => `<tr><td>${esc(r[0])}</td><td class="n">${esc(r[1])}</td></tr>`).join("")}</table></section>
+  <section class="card"><details><summary>Правила питания</summary><div class="kv" style="margin-top:10px">${goalRules().map(r => `<b>${esc(r[0])}</b><span>${esc(r[1])}</span>`).join("")}</div></details></section>`;
 }
 
 function vTrain(){
@@ -507,8 +786,8 @@ function vTrain(){
     <div class="rowh" style="margin-top:4px"><h2 style="font-size:21px">${esc(p.title)}</h2><span class="pill ${td.full ? "g" : ""}">${td.n} из ${td.of}</span></div>
     <div class="pills">${p.time ? `<span class="pill">${esc(p.time)}</span>` : ""}${p.dur ? `<span class="pill">${esc(p.dur)}</span>` : ""}
       ${p.pulse ? `<span class="pill r">пульс ${p.pulse}</span>` : ""}${p.inten ? `<span class="pill o">интенсивность ${esc(p.inten)}</span>` : ""}</div>
-    ${p.type === "strength" ? `<div class="tip">${esc(D.focus[w-1])}</div>` : ""}
-    ${p.type === "interval" ? `<div class="tip">Где: быстрая ходьба в горку, подъём по лестнице, велосипед или велотренажёр. Бег и прыжки первые 8 недель не нужны: лишняя нагрузка на колени.</div><div id="itimer"></div>` : ""}
+    ${p.type === "strength" ? `<div class="tip">${esc(program().focus[w-1])}</div>` : ""}
+    ${p.type === "interval" ? `<div class="tip">Где: ${esc(p.mode)}.${program().e.noRun ? " Бег и прыжки вам пока не нужны: лишняя нагрузка на суставы." : ""}</div><div id="itimer"></div>` : ""}
     ${p.type === "rest" ? `<div class="tip">Силовых нет. Шаги всё равно по цели.</div>` : ""}
   </section>
   <section class="card"><div class="list">${items}</div></section>
@@ -522,14 +801,14 @@ function vTrain(){
 }
 
 function vSteps(){
-  const w = weekOf(S.sel), first = (w-1)*7, g = D.steps[w-1]*1000, t = todayIdx();
+  const w = weekOf(S.sel), first = (w-1)*7, g = program().steps[w-1]*1000, t = todayIdx();
   let sum = 0, cnt = 0, hit = 0;
   const rows = Array.from({ length: 7 }, (_, j) => { const i = first + j, s = day(i).steps;
     if (s != null) { sum += s; cnt++; if (s >= g) hit++; }
     return `<div class="steprow ${i === t ? "cur" : ""}"><div><div class="dn">${WD[j]}</div><div class="hint" style="margin-top:0">${fmtDate(i)}</div></div>
       <input class="field sm" inputmode="numeric" autocomplete="off" placeholder="—" data-f="steps" data-i="${i}" value="${s != null ? s : ""}" aria-label="Шаги ${WD[j]}">
       <span class="ok ${s != null && s >= g ? "on" : ""}">${CHECK}</span></div>`; }).join("");
-  const avgs = D.steps.map((gg, k) => { let s = 0, n = 0; for (let j = 0; j < 7; j++) { const v = day(k*7+j).steps; if (v != null) { s += v; n++; } } return { avg: n ? s/n : null, goal: gg*1000 }; });
+  const avgs = program().steps.map((gg, k) => { let s = 0, n = 0; for (let j = 0; j < 7; j++) { const v = day(k*7+j).steps; if (v != null) { s += v; n++; } } return { avg: n ? s/n : null, goal: gg*1000 }; });
   const maxV = Math.max(13000, ...avgs.map(a => a.avg || 0));
   const bars = avgs.map((a, k) => `<div title="Неделя ${k+1}"><u style="bottom:${a.goal/maxV*100}%"></u>${a.avg != null ? `<i class="${a.avg < a.goal ? "miss" : ""}" style="height:${a.avg/maxV*100}%"></i>` : ""}</div>`).join("");
   return `
@@ -541,7 +820,11 @@ function vSteps(){
       <div class="stat"><small>Всего</small><b>${cnt ? int(sum) : "—"}</b></div>
       <div class="stat"><small>Внесено дней</small><b>${cnt}</b></div>
     </div></section>
-  <section class="card">${rows}<div class="hint">Шаги смотрите в приложении телефона или часов и вносите вечером.</div></section>
+  <section class="card">${rows}<div style="margin-top:10px"><button class="btn sec" data-health>♥ Шаги за сегодня из «Здоровья»</button></div>
+    <details style="margin-top:10px"><summary>Как подключить «Здоровье» на iPhone</summary>${healthHelp()}</details><div class="hint">Шаги смотрите в приложении телефона или часов и вносите вечером.</div></section>
+  <div class="sec-title">${WD[S.sel%7]}, ${fmtDate(S.sel)}</div>
+  ${activityCard(S.sel)}
+  ${balanceCard(S.sel)}
   <div class="sec-title">Среднее по неделям</div>
   <section class="card"><div class="bars">${bars}</div><div class="lbl">${avgs.map((_, k) => `<span>${k+1}</span>`).join("")}</div>
     <div class="hint">Пунктир: цель недели. Зелёный: цель выполнена, оранжевый: ниже цели.</div></section>`;
@@ -598,55 +881,232 @@ function vProgress(){
 }
 
 const SEX = { m: "Мужской", f: "Женский" };
+function warnCard(list, compact){
+  if (!list.length) return "";
+  return `<section class="card warncard"><div class="rowh"><h2 style="font-size:16px">Нужна консультация врача</h2></div>
+    ${compact ? `<div class="tip">${list.map(x => esc(x[1])).join(" · ")}</div><details><summary>Подробнее</summary>` : ""}
+    <div class="kv" style="margin-top:10px">${list.map(x => `<b>${esc(x[1])}</b><span>${esc(x[2])}</span>`).join("")}</div>
+    ${compact ? "</details>" : ""}
+    <div class="tip" style="margin-top:8px">Приложение не заменяет врача. Если во время тренировки появились боль в груди, головокружение, сильная одышка или боль в суставе, остановитесь.</div></section>`;
+}
 function profileCard(){
-  const p = S.profile, z = zones();
-  return `<section class="card"><div class="rowh"><h2 style="font-size:16px">Параметры</h2><button class="btn sec" style="padding:7px 12px;font-size:13px" data-setup="open">Изменить</button></div>
+  const p = prof(), z = zones(), e = effective(), n = nutrition();
+  return `<section class="card"><div class="rowh"><h2 style="font-size:16px">Ваш план</h2><button class="btn sec" style="padding:7px 12px;font-size:13px" data-setup="open">Изменить</button></div>
     <div class="kv" style="margin-top:10px"><b>Старт программы</b><span>${fmtDate(0)} ${dateAt(0).getFullYear()}</span>
+    <b>Цель</b><span>${esc(GOALS[e.goal])}${e.goal === "lose" ? ", темп: " + esc((PACES[p.pace] || (p.v ? PACES[defPace(e.bmi)] : PACES.fast)).toLowerCase()) : ""}${e.changed ? " (изменена из-за здоровья)" : ""}</span>
+    <b>Ступень формы</b><span>${e.level} · ${esc(LEVELS[e.level][0])}</span>
+    <b>Где</b><span>${esc(PLACES[e.place])}</span>
     <b>Пол, возраст</b><span>${esc(SEX[p.sex] || "—")}, ${esc(p.age || "—")}</span><b>Рост</b><span>${esc(p.height || "—")} см</span>
-    <b>Стартовый вес</b><span>${esc(num(p.startWeight))} кг</span><b>Макс. пульс</b><span>${z.max} уд/мин</span>
-    <b>Калории</b><span>${esc(kcalHint() || "—")}</span></div></section>`;
+    <b>Стартовый вес</b><span>${esc(num(p.startWeight))} кг</span><b>Работа</b><span>${esc(JOBS[p.job] || "—")}</span>
+    <b>Калории</b><span>${int(n.t)} ккал в день</span><b>Макс. пульс</b><span>${z.max} уд/мин</span></div></section>
+    ${warnCard(warnings(), true)}`;
+}
+function seg(id, opts, cur){
+  return `<div class="seg" id="${id}">${Object.keys(opts).map(k => `<button type="button" class="${k === cur ? "on" : ""}" data-seg="${id}" data-v="${k}">${esc(opts[k])}</button>`).join("")}</div>`;
 }
 function vSetup(){
-  const p = S.profile, first = !p.start, d = p.start || ymd(new Date());
-  return `<section class="card hero"><div class="eyebrow">${first ? "Первый запуск" : "Параметры"}</div><h1>${first ? "Настроим план под вас" : "Изменить параметры"}</h1>
-    <div class="muted small">Возраст нужен для пульсовых зон, рост и вес для ИМТ и ориентира по калориям. Всё хранится только на этом устройстве.</div></section>
-  <section class="card">
-    <label class="hint" style="display:block;margin:0 0 6px">Пол</label>
-    <div class="seg" id="s-sex"><button class="${p.sex === "f" ? "" : "on"}" data-sex="m">Мужской</button><button class="${p.sex === "f" ? "on" : ""}" data-sex="f">Женский</button></div>
+  const p = prof(), first = !S.profile.start, d = S.profile.start || ymd(new Date()), h = p.health;
+  const lab = (f, t) => `<label class="hint" for="${f}" style="display:block;margin:0 0 6px">${t}</label>`;
+  const chk = (k, t) => `<label class="chk"><input type="checkbox" data-h="${k}" ${h[k] ? "checked" : ""}><span>${esc(t)}</span></label>`;
+  return `<section class="card hero"><div class="eyebrow">${first ? "Первый запуск" : "Параметры"}</div><h1>${first ? "Подберём план под вас" : "Изменить план"}</h1>
+    <div class="muted small">Шесть коротких шагов. По ответам приложение посчитает калории и граммовки, подберёт упражнения и нагрузку. Всё хранится только на этом устройстве.</div></section>
+  <section class="card"><h2 class="stp">1. О себе</h2>
+    ${lab("", "Пол")}${seg("s-sex", SEX, p.sex === "f" ? "f" : "m")}
     <div class="grid2" style="margin-top:12px">
-      <div><label class="hint" for="s-age" style="display:block;margin:0 0 6px">Возраст, лет</label><input id="s-age" class="field sm" inputmode="numeric" autocomplete="off" value="${esc(p.age || "")}"></div>
-      <div><label class="hint" for="s-h" style="display:block;margin:0 0 6px">Рост, см</label><input id="s-h" class="field sm" inputmode="numeric" autocomplete="off" value="${esc(p.height || "")}"></div>
-      <div><label class="hint" for="s-w" style="display:block;margin:0 0 6px">Вес сейчас, кг</label><input id="s-w" class="field sm" inputmode="decimal" autocomplete="off" value="${esc(num(p.startWeight))}"></div>
-      <div><label class="hint" for="s-d" style="display:block;margin:0 0 6px">Дата старта</label><input id="s-d" class="field sm" type="date" value="${esc(d)}"></div>
+      <div>${lab("s-age", "Возраст, лет")}<input id="s-age" class="field sm" inputmode="numeric" autocomplete="off" value="${esc(p.age || "")}"></div>
+      <div>${lab("s-h", "Рост, см")}<input id="s-h" class="field sm" inputmode="numeric" autocomplete="off" value="${esc(p.height || "")}"></div>
+      <div>${lab("s-w", "Вес сейчас, кг")}<input id="s-w" class="field sm" inputmode="decimal" autocomplete="off" value="${esc(num(p.startWeight))}"></div>
     </div>
+    <div style="margin-top:12px">${lab("", "Работа")}${seg("s-job", JOBS, p.job)}</div></section>
+  <section class="card"><h2 class="stp">2. Цель</h2>${seg("s-goal", GOALS, p.goal)}<div class="hint" id="s-goald"></div>
+    <div id="s-pacew" style="margin-top:12px"><label class="hint" style="display:block;margin:0 0 6px">Темп похудения</label>${seg("s-pace", PACES, PACES[p.pace] ? p.pace : (S.profile.start && !p.v ? "fast" : defPace(p.startWeight && p.height ? bmiOf(p.startWeight, p.height) : 27)))}<div class="hint" id="s-paced"></div></div></section>
+  <section class="card"><h2 class="stp">3. Физическая форма</h2>
+    <div class="tip" style="margin-top:0">Быстрый тест, можно пропустить: сколько раз подряд получится сделать с хорошей техникой?</div>
+    <div class="grid2" style="margin-top:10px">
+      <div>${lab("s-pu", "Отжиманий от пола")}<input id="s-pu" class="field sm" inputmode="numeric" autocomplete="off" placeholder="—" value="${esc(p.testPush != null ? p.testPush : "")}"></div>
+      <div>${lab("s-pl", "Подтягиваний")}<input id="s-pl" class="field sm" inputmode="numeric" autocomplete="off" placeholder="—" value="${esc(p.testPull != null ? p.testPull : "")}"></div>
+    </div>
+    <div class="hint" id="s-sug"></div>
+    <div class="lvls" id="s-level" style="margin-top:10px">${[1,2,3,4,5].map(l => `<button type="button" class="lvl ${+p.level === l ? "on" : ""}" data-lv="${l}">
+      <b>${l} · ${esc(LEVELS[l][0])}</b><span>${esc(LEVELS[l][1])}</span></button>`).join("")}</div></section>
+  <section class="card"><h2 class="stp">4. Где тренируетесь</h2>${seg("s-place", PLACES, p.place)}
+    <div class="hint">Для силовых пригодится рюкзак, в который можно положить бутылки с водой.</div></section>
+  <section class="card"><h2 class="stp">5. Здоровье</h2>
+    <div class="tip" style="margin-top:0">Отметьте, если что-то из этого про вас. От ответов зависят калории и нагрузка.</div>
+    <div id="s-fem" style="${p.sex === "f" ? "" : "display:none"}">${chk("pregnant", "Беременность")}${chk("bf", "Кормлю грудью")}</div>
+    ${Object.keys(HEALTH).map(k => chk(k, HEALTH[k])).join("")}
+    <div id="s-warn"></div>
+    <label class="chk" id="s-ackw" style="display:none"><input type="checkbox" id="s-ack" ${p.ack ? "checked" : ""}><span><b>Я проконсультируюсь с врачом перед началом программы</b></span></label></section>
+  <section class="card"><h2 class="stp">6. Старт</h2>
+    ${lab("s-d", "Дата старта")}<input id="s-d" class="field sm" type="date" value="${esc(d)}">
     <div class="hint" id="s-prev"></div>
     <div class="hint" id="s-err" style="color:var(--fast)"></div>
-    <div class="pills" style="margin-top:12px;gap:8px"><button class="btn" data-setup="save">${first ? "Начать" : "Сохранить"}</button>${first ? "" : '<button class="btn sec" data-setup="cancel">Отмена</button>'}</div>
-  </section>
+    <div class="pills" style="margin-top:12px;gap:8px"><button class="btn" data-setup="save">${first ? "Получить план" : "Сохранить"}</button>${first ? "" : '<button class="btn sec" data-setup="cancel">Отмена</button>'}</div></section>
   ${first ? setupExtra() : ""}
-  <section class="card"><div class="tip">План питания (около 1 800 ккал) и программа тренировок одинаковы для всех. После настройки приложение покажет ваш ориентир по калориям и подскажет, насколько изменить порции.</div></section>`;
+  <section class="card"><div class="tip">Приложение подбирает план по формулам и готовым программам. Оно не заменяет врача, тренера и диетолога.</div></section>`;
 }
-function setupPreview(){
+function readSetup(){
+  const g = id => document.getElementById(id), on = id => { const b = document.querySelector("#" + id + " button.on"); return b ? b.dataset.v : null; };
+  const lv = document.querySelector("#s-level .lvl.on"), health = {};
+  document.querySelectorAll("[data-h]").forEach(x => { if (x.checked) health[x.dataset.h] = true; });
+  const sex = on("s-sex") || "m"; if (sex !== "f") { delete health.pregnant; delete health.bf; }
+  return { sex, job: on("s-job") || "sit", goal: on("s-goal") || "lose", pace: on("s-pace") || "mid", place: on("s-place") || "bar", level: lv ? +lv.dataset.lv : 2,
+    age: parseNum(g("s-age").value), height: parseNum(g("s-h").value), startWeight: parseNum(g("s-w").value),
+    testPush: parseNum(g("s-pu").value), testPull: parseNum(g("s-pl").value), health, ack: !!(g("s-ack") && g("s-ack").checked), d: parseKey(g("s-d").value) };
+}
+function suggestLevel(pu, pl){
+  if (pu == null || Number.isNaN(pu)) return null;
+  let l = pu < 1 ? 1 : pu <= 10 ? 2 : pu <= 25 ? 3 : pu <= 40 ? 4 : 5;
+  if (pl != null && !Number.isNaN(pl)) { if (l >= 5 && pl < 12) l = 4; if (l >= 4 && pl < 5) l = 3; }
+  return l;
+}
+function setupLive(){
   const el = document.getElementById("s-prev"), v = document.getElementById("s-d"); if (!el || !v) return;
-  const d = parseKey(v.value); if (!d) { el.textContent = ""; return; }
-  const m = mondayOf(d);
-  el.textContent = "Программа идёт неделями с понедельника: неделя 1 начнётся в понедельник, " + m.getDate() + " " + MON[m.getMonth()] + ".";
+  const r = readSetup(), dd = parseKey(v.value);
+  if (dd) { const m = mondayOf(dd); el.textContent = "Программа идёт неделями с понедельника: неделя 1 начнётся в понедельник, " + m.getDate() + " " + MON[m.getMonth()] + "."; } else el.textContent = "";
+  document.getElementById("s-goald").textContent = GOAL_DESC[r.goal] || "";
+  document.getElementById("s-pacew").style.display = r.goal === "lose" ? "" : "none";
+  document.getElementById("s-paced").textContent = PACE_DESC[r.pace] || "";
+  document.getElementById("s-fem").style.display = r.sex === "f" ? "" : "none";
+  const sl = suggestLevel(r.testPush, r.testPull);
+  document.getElementById("s-sug").textContent = sl ? "По тесту подходит ступень " + sl + " «" + LEVELS[sl][0] + "». Выберите её или ту, что честнее про вас." : "";
+  const src = { sex: r.sex, age: r.age, height: r.height, startWeight: r.startWeight, health: r.sex === "f" ? r.health : Object.assign({}, r.health, { pregnant: false, bf: false }), goal: r.goal, level: r.level };
+  const list = (r.age > 0 && r.height > 0 && r.startWeight > 0) ? warnings(src) : warnings(Object.assign({}, src, { height: 0 }));
+  document.getElementById("s-warn").innerHTML = warnCard(list, false);
+  document.getElementById("s-ackw").style.display = list.length ? "" : "none";
 }
 function saveSetup(){
-  const g = id => document.getElementById(id), err = g("s-err");
-  const age = parseNum(g("s-age").value), h = parseNum(g("s-h").value), w = parseNum(g("s-w").value), d = parseKey(g("s-d").value);
-  const sexBtn = document.querySelector("#s-sex button.on"), sex = sexBtn ? sexBtn.dataset.sex : "m";
-  const bad = [];
-  if (!(age >= 14 && age <= 90)) bad.push("возраст от 14 до 90");
-  if (!(h >= 120 && h <= 230)) bad.push("рост от 120 до 230 см");
-  if (!(w >= 35 && w <= 300)) bad.push("вес от 35 до 300 кг");
-  if (!d) bad.push("дату старта");
+  const err = document.getElementById("s-err"), r = readSetup(), bad = [];
+  if (!(r.age >= 14 && r.age <= 90)) bad.push("возраст от 14 до 90");
+  if (!(r.height >= 120 && r.height <= 230)) bad.push("рост от 120 до 230 см");
+  if (!(r.startWeight >= 35 && r.startWeight <= 300)) bad.push("вес от 35 до 300 кг");
+  if (!r.d) bad.push("дату старта");
   if (bad.length) { err.textContent = "Проверьте: " + bad.join(", ") + "."; return; }
-  S.profile = Object.assign({}, S.profile, { sex, age: Math.round(age), height: Math.round(h), startWeight: Math.round(w*10)/10, start: ymd(mondayOf(d)) });
+  const np = { sex: r.sex, age: Math.round(r.age), height: Math.round(r.height), startWeight: Math.round(r.startWeight * 10) / 10, start: ymd(mondayOf(r.d)),
+    job: r.job, goal: r.goal, pace: r.pace, level: r.level, place: r.place, health: r.health, ack: r.ack, v: 2 };
+  if (r.testPush != null && !Number.isNaN(r.testPush)) np.testPush = Math.round(r.testPush);
+  if (r.testPull != null && !Number.isNaN(r.testPull)) np.testPull = Math.round(r.testPull);
+  if (warnings(np).length && !r.ack) { err.textContent = "Отметьте в пункте 5, что проконсультируетесь с врачом."; document.getElementById("s-ackw").scrollIntoView({ block: "center" }); return; }
+  S.profile = Object.assign({}, S.profile, np); PG = null; MP = null;
   S.setup = false; S.sel = clampI(todayIdx()); S.tab = "today";
   queueSave("profile"); render(); window.scrollTo(0, 0);
 }
-document.addEventListener("input", e => { if (e.target.id === "s-d") setupPreview(); });
+document.addEventListener("input", e => { if (e.target.closest && e.target.closest("#main") && document.getElementById("s-prev")) setupLive(); });
+document.addEventListener("change", e => { if (e.target.matches && e.target.matches("[data-h], #s-ack")) setupLive(); });
+
+/* ---------- steps from Apple Health via Shortcuts ---------- */
+const SHORTCUT = "Гром шаги";
+function healthHelp(){
+  return `<div class="tip">Сайты на iPhone не могут читать «Здоровье» напрямую, поэтому шаги передаёт быстрая команда. Настраивается один раз:</div>
+  <ol class="small" style="margin:8px 0 0;padding-left:20px;line-height:1.55">
+    <li>Откройте приложение «Команды» → «+». Назовите команду <b>${SHORTCUT}</b> (именно так).</li>
+    <li>Добавьте действие <b>«Найти образцы здоровья»</b>: тип «Шаги», фильтр «Дата начала» — «Сегодня».</li>
+    <li>Добавьте <b>«Вычислить статистику»</b> → «Сумма» для найденных образцов.</li>
+    <li>Добавьте <b>«Текст»</b> и впишите: <b>GROM</b>, пробел, переменная «Статистика», пробел, переменная «Текущая дата» с форматом «Свой»: <b>yyyy-MM-dd</b>.</li>
+    <li>Добавьте <b>«Скопировать в буфер обмена»</b>. Сохраните команду и один раз запустите её, разрешив доступ к «Здоровью».</li>
+  </ol>
+  <div class="tip">Как пользоваться: нажмите «Из «Здоровья»» — откроется команда. Вернитесь в «Гром» и нажмите кнопку ещё раз: шаги подставятся сами. Если носите Apple Watch, шаги с часов и телефона могут сложиться дважды — тогда в шаге 2 добавьте фильтр «Источник» — ваш iPhone.</div>`;
+}
+let healthAsked = 0;
+async function healthSteps(){
+  let txt = "";
+  try { if (navigator.clipboard && navigator.clipboard.readText) txt = await navigator.clipboard.readText(); } catch (e) {}
+  const m = /GROM\s+([\d\s.,]+?)\s*(\d{4}-\d{2}-\d{2})?\s*$/i.exec((txt || "").trim());
+  if (m) {
+    const v = Math.round(parseFloat(m[1].replace(/\s/g, "").replace(",", "."))), k = m[2], i = k ? idxOfKey(k) : clampI(todayIdx());
+    if (v >= 0 && v < 100000 && i >= 0 && i < DAYS) {
+      mutDay(i, d => { d.steps = v; }); S.sel = i; render(); toast("Шаги за " + fmtDate(i) + ": " + int(v));
+      try { await navigator.clipboard.writeText(""); } catch (e) {}
+      return;
+    }
+  }
+  if (Date.now() - healthAsked < 120000) { toast("Не нашёл шаги в буфере. Проверьте команду «" + SHORTCUT + "»: инструкция во вкладке «Активность»."); }
+  healthAsked = Date.now();
+  location.href = "shortcuts://run-shortcut?name=" + encodeURIComponent(SHORTCUT);
+}
+const idxOfKey = k => { const d = parseKey(k); return d ? Math.round((d - startDate()) / 864e5) : -1; };
+let toastT = null;
+function toast(t){ let el = document.getElementById("toast"); if (!el) { el = document.createElement("div"); el.id = "toast"; el.className = "toast"; document.body.appendChild(el); }
+  el.textContent = t; el.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove("on"), 3500); }
+
+/* ---------- calorie calculators ---------- */
+const FOODS = [
+  ["Хлеб белый, батон", 265], ["Хлеб ржаной", 210], ["Печенье", 450], ["Шоколад", 540], ["Конфеты шоколадные", 500], ["Чипсы", 540],
+  ["Орехи", 600], ["Семечки", 580], ["Сыр", 350], ["Колбаса варёная, сосиски", 260], ["Колбаса копчёная", 450], ["Пицца", 270],
+  ["Бургер", 260], ["Картофель фри", 310], ["Шаурма", 220], ["Пельмени", 275], ["Макароны варёные", 140], ["Рис варёный", 115],
+  ["Гречка варёная", 110], ["Картофель варёный", 80], ["Банан", 95], ["Яблоко, груша", 47], ["Мороженое", 230], ["Йогурт сладкий", 100],
+  ["Молоко 2,5% (мл)", 52], ["Кефир 2,5% (мл)", 50], ["Сок (мл)", 45], ["Газировка сладкая (мл)", 42], ["Пиво (мл)", 43], ["Вино (мл)", 80],
+  ["Сахар", 400], ["Мёд, варенье", 300], ["Майонез", 630], ["Масло сливочное", 750], ["Курица жареная", 210], ["Свинина жареная", 300]];
+const ACTS = [
+  ["Бег трусцой", 7], ["Бег быстрый", 10], ["Велосипед спокойно", 6], ["Велосипед быстро", 9], ["Плавание", 7], ["Футбол", 8],
+  ["Баскетбол, волейбол", 6.5], ["Теннис, бадминтон", 6], ["Танцы", 5], ["Скакалка", 11], ["Подъём по лестнице", 8], ["Тренажёрный зал", 5],
+  ["Йога, растяжка", 2.5], ["Уборка, работа в саду", 3.5], ["Лыжи, коньки", 7]];
+function extraFood(i){ return (day(i).extra || []); }
+function burned(i){
+  const p = prof(), d = day(i), w = d.weight || curWeight(), fem = p.sex === "f";
+  const bmr = 10*w + 6.25*(p.height || 175) - 5*(p.age || 30) + (fem ? -161 : 5);
+  const base = bmr * ({ sit: 1.2, stand: 1.375, phys: 1.55 }[p.job] || 1.2);
+  const steps = (d.steps || 0) * w * 0.0005;
+  const pl = plan(i), td = trainDone(i), frac = td.of ? td.n / td.of : 0;
+  let train = 0;
+  if (pl.type === "strength") train = 4 * w * (parseInt(pl.dur, 10) || 45) / 60 * frac;
+  if (pl.type === "interval") train = 3 * w * (pl.iv ? pl.iv.total : 30) / 60 * frac;
+  const act = (d.act || []).reduce((s, a) => s + (a.kcal || 0), 0);
+  const r = { base: Math.round(base), steps: Math.round(steps), train: Math.round(train), act: Math.round(act) };
+  r.total = r.base + r.steps + r.train + r.act; return r;
+}
+function balanceCard(i){
+  const ft = foodTotals(i), b = burned(i), bal = ft.kcal - b.total, n = nutrition();
+  return `<section class="card"><div class="rowh"><div><div class="eyebrow">Калории за день</div><h2 style="margin-top:3px">${bal <= 0 ? "Дефицит " + int(-bal) : "Профицит " + int(bal)} ккал</h2></div>
+    <span class="pill ${(n.e.goal === "gain") === (bal > 0) ? "g" : "o"}">${n.e.goal === "gain" ? "нужен профицит" : n.e.goal === "lose" ? "нужен дефицит" : "нужен ноль"}</span></div>
+    <div class="grid2" style="margin-top:10px">
+      <div class="stat"><small>Съедено</small><b>${int(ft.kcal)}</b><small>по отметкам${ft.extra ? ", доп. " + int(ft.extra) : ""}</small></div>
+      <div class="stat"><small>Потрачено</small><b>${int(b.total)}</b><small>оценка</small></div></div>
+    <div class="kv small" style="margin-top:10px"><b>Обмен и быт</b><span>${int(b.base)} ккал</span><b>Шаги</b><span>${int(b.steps)} ккал</span>
+      <b>Тренировка</b><span>${int(b.train)} ккал</span><b>Другая активность</b><span>${int(b.act)} ккал</span></div>
+    <div class="hint">Съеденное считается по отмеченным приёмам пищи и добавленной еде. Расход — примерная оценка по весу, шагам и отмеченным тренировкам.</div></section>`;
+}
+function extraFoodCard(i){
+  const list = extraFood(i);
+  return `<section class="card"><h2 style="font-size:16px">Съедено дополнительно</h2>
+    <div class="tip" style="margin-top:4px">Всё, что съели или выпили сверх плана. Калории добавятся к дню.</div>
+    ${list.length ? `<table class="ing" style="margin-top:8px">${list.map((x, k) => `<tr><td>${esc(x.n)}${x.g ? ", " + x.g + (/\(мл\)/.test(x.n) ? "" : " г") : ""}</td><td class="n">${int(x.kcal)} ккал</td>
+      <td class="n" style="width:34px"><button class="xbtn" data-delfood="${k}" aria-label="Удалить">×</button></td></tr>`).join("")}</table>` : ""}
+    <div class="addrow"><select id="af-p" class="field sm"><option value="">Свой продукт, ккал вручную</option>${FOODS.map((f, k) => `<option value="${k}">${esc(f[0])} · ${f[1]} ккал/100</option>`).join("")}</select></div>
+    <div class="grid2" style="margin-top:8px">
+      <div><input id="af-g" class="field sm" inputmode="numeric" placeholder="Граммы или мл"></div>
+      <div><input id="af-k" class="field sm" inputmode="numeric" placeholder="или ккал сразу"></div></div>
+    <input id="af-n" class="field sm" style="margin-top:8px" placeholder="Название (для своего продукта)" maxlength="60">
+    <div class="pills" style="margin-top:8px"><button class="btn" data-add="food">Добавить</button><span class="hint" id="af-msg" style="margin:0 0 0 6px"></span></div></section>`;
+}
+function activityCard(i){
+  const list = day(i).act || [];
+  return `<section class="card"><h2 style="font-size:16px">Другая активность</h2>
+    <div class="tip" style="margin-top:4px">Спорт и нагрузки сверх плана. Ходьбу сюда не добавляйте: она уже посчитана по шагам.</div>
+    ${list.length ? `<table class="ing" style="margin-top:8px">${list.map((x, k) => `<tr><td>${esc(x.n)}, ${x.min} мин</td><td class="n">${int(x.kcal)} ккал</td>
+      <td class="n" style="width:34px"><button class="xbtn" data-delact="${k}" aria-label="Удалить">×</button></td></tr>`).join("")}</table>` : ""}
+    <div class="grid2" style="margin-top:8px">
+      <div><select id="aa-t" class="field sm">${ACTS.map((a, k) => `<option value="${k}">${esc(a[0])}</option>`).join("")}</select></div>
+      <div><input id="aa-m" class="field sm" inputmode="numeric" placeholder="Минут"></div></div>
+    <div class="pills" style="margin-top:8px"><button class="btn" data-add="act">Добавить</button><span class="hint" id="aa-msg" style="margin:0 0 0 6px"></span></div></section>`;
+}
+function addFood(){
+  const sel = document.getElementById("af-p").value, g = parseNum(document.getElementById("af-g").value), k = parseNum(document.getElementById("af-k").value),
+    nm = (document.getElementById("af-n").value || "").trim().slice(0, 60), msg = document.getElementById("af-msg");
+  let item = null;
+  if (k != null && k > 0 && k < 5000) item = { n: sel !== "" ? FOODS[+sel][0] : (nm || "Свой продукт"), g: g > 0 ? Math.round(g) : undefined, kcal: Math.round(k) };
+  else if (sel !== "" && g > 0 && g < 3000) item = { n: FOODS[+sel][0], g: Math.round(g), kcal: Math.round(FOODS[+sel][1] * g / 100) };
+  if (!item) { msg.textContent = sel === "" ? "Введите калории" : "Введите граммы"; return; }
+  if (item.g === undefined) delete item.g;
+  mutDay(S.sel, d => { d.extra = (d.extra || []).concat([item]); }); render();
+}
+function addAct(){
+  const t = +document.getElementById("aa-t").value, m = parseNum(document.getElementById("aa-m").value), msg = document.getElementById("aa-msg");
+  if (!(m > 0 && m <= 600)) { msg.textContent = "Введите минуты"; return; }
+  const w = day(S.sel).weight || curWeight(), a = ACTS[t];
+  const item = { n: a[0], min: Math.round(m), kcal: Math.round((a[1] - 1) * w * m / 60) };
+  mutDay(S.sel, d => { d.act = (d.act || []).concat([item]); }); render();
+}
 
 /* ---------- render ---------- */
 function isEditing(){ const a = document.activeElement; return a && a.tagName === "INPUT" && document.getElementById("main").contains(a); }
@@ -657,7 +1117,7 @@ function render(){
   if (setup) document.getElementById("strip").innerHTML = ""; else renderStrip();
   renderTabs(); syncUI();
   const main = document.getElementById("main");
-  if (setup) { main.innerHTML = vSetup(); setupPreview(); afterRender(); return; }
+  if (setup) { main.innerHTML = vSetup(); setupLive(); afterRender(); return; }
   const v = { today: vToday, food: vFood, train: vTrain, steps: vSteps, progress: vProgress }[S.tab]();
   main.innerHTML = v;
   afterRender();
@@ -730,7 +1190,13 @@ setInterval(() => {
 document.addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
   const ds = b.dataset;
-  if (ds.sex) { document.querySelectorAll("#s-sex button").forEach(x => x.classList.toggle("on", x === b)); return; }
+  if (ds.seg) { b.parentNode.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); setupLive(); return; }
+  if (ds.lv) { document.querySelectorAll("#s-level .lvl").forEach(x => x.classList.toggle("on", x === b)); return; }
+  if (ds.health != null) { healthSteps(); return; }
+  if (ds.add === "food") { addFood(); return; }
+  if (ds.add === "act") { addAct(); return; }
+  if (ds.delfood != null) { const k = +ds.delfood; mutDay(S.sel, d => { d.extra = (d.extra || []).filter((_, j) => j !== k); }); render(); return; }
+  if (ds.delact != null) { const k = +ds.delact; mutDay(S.sel, d => { d.act = (d.act || []).filter((_, j) => j !== k); }); render(); return; }
   if (ds.setup === "open") { S.setup = true; render(); window.scrollTo(0, 0); return; }
   if (ds.setup === "cancel") { S.setup = false; render(); return; }
   if (ds.setup === "save") { saveSetup(); return; }
@@ -768,6 +1234,7 @@ document.addEventListener("change", e => { if (e.target.matches("input[data-f]")
 document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.matches("input[data-f]")) e.target.blur(); });
 
 /* ---------- boot ---------- */
+window.__plan = { program, nutrition, mealPlan, plan, foodTotals, warnings, burned };
 boot();
 })();
 </script>
