@@ -707,6 +707,7 @@ function settingsCard(sw) {
       <button class="btn sec" data-restore>Восстановить из копии</button>
       <button class="btn sec" data-export>Таблица CSV</button>
     </div>
+    <div style="margin-top:14px"><button class="btn sec" style="color:var(--fast)" data-wipe>Стереть все данные на этом устройстве</button></div>
     <input type="file" id="f-restore" accept=".json,application/json" hidden>
     <div class="hint" id="backupstate">${esc(P.msg || (t ? "Последняя копия: " + t.toLocaleDateString("ru-RU") : "Копий ещё не было."))}</div></section>`;
 }
@@ -745,6 +746,11 @@ function extraClick(ds, b) {
     const data = JSON.stringify({ app: "plan-pokhudeniya", v: 1, saved: today, days: S.days, profile: S.profile });
     saveFile("plan-kopiya-" + today + ".json", data, "application/json").then(ok => { if (ok) { LS.set("pp_backup", Date.now()); P.msg = "Копия сохранена."; render(); } });
     return true;
+  }
+  if (ds.wipe != null) {
+    if (!confirm("Стереть анкету, вес, шаги, отметки и архив продуктов на этом устройстве? Отменить будет нельзя.")) return true;
+    try { localStorage.removeItem("pp_data"); localStorage.removeItem("pp_backup"); localStorage.removeItem("pp_tab"); } catch (e) {}
+    S.days = {}; S.profile = {}; S.setup = false; S.tab = "today"; P.msg = ""; persist(); render(); window.scrollTo(0, 0); return true;
   }
   if (ds.restore != null) { const f = document.getElementById("f-restore"); if (f) { f.value = ""; f.click(); } return true; }
   if (ds.export != null) {
