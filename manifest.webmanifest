@@ -4,7 +4,7 @@
   "lang": "ru",
   "display": "standalone",
   "scope": "./",
-  "background_color": "#f4f5f2",
+  "background_color": "#ffffff",
   "theme_color": "#d62828",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
