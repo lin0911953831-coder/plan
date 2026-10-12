@@ -1165,14 +1165,12 @@ function balanceCard(i){
 function extraFoodCard(i){
   const list = extraFood(i);
   return `<section class="card"><h2 style="font-size:16px">Съедено дополнительно</h2>
-    <div class="tip" style="margin-top:4px">Всё, что съели или выпили сверх плана. Калории добавятся к дню.</div>
-    ${list.length ? `<table class="ing" style="margin-top:8px">${list.map((x, k) => `<tr><td>${esc(x.n)}${x.g ? ", " + x.g + (/\(мл\)/.test(x.n) ? "" : " г") : ""}</td><td class="n">${int(x.kcal)} ккал</td>
+    <div class="tip" style="margin-top:4px">Всё, что съели или выпили сверх плана. Килокалории смотрите на упаковке или в интернете, они добавятся к дню.</div>
+    ${list.length ? `<table class="ing" style="margin-top:8px">${list.map((x, k) => `<tr><td>${esc(x.n)}</td><td class="n">${int(x.kcal)} ккал</td>
       <td class="n" style="width:34px"><button class="xbtn" data-delfood="${k}" aria-label="Удалить">×</button></td></tr>`).join("")}</table>` : ""}
-    <div class="addrow"><select id="af-p" class="field sm"><option value="">Свой продукт, ккал вручную</option>${FOODS.map((f, k) => `<option value="${k}">${esc(f[0])} · ${f[1]} ккал/100</option>`).join("")}</select></div>
-    <div class="grid2" style="margin-top:8px">
-      <div><input id="af-g" class="field sm" inputmode="numeric" placeholder="Граммы или мл"></div>
-      <div><input id="af-k" class="field sm" inputmode="numeric" placeholder="или ккал сразу"></div></div>
-    <input id="af-n" class="field sm" style="margin-top:8px" placeholder="Название (для своего продукта)" maxlength="60">
+    <div class="grid2" style="margin-top:10px">
+      <div><label class="hint" for="af-n" style="display:block;margin:0 0 6px">Что съели</label><input id="af-n" class="field sm" placeholder="Например, пирожок" maxlength="60" autocomplete="off"></div>
+      <div><label class="hint" for="af-k" style="display:block;margin:0 0 6px">Килокалории, ккал</label><input id="af-k" class="field sm" inputmode="numeric" placeholder="ккал" autocomplete="off"></div></div>
     <div class="pills" style="margin-top:8px"><button class="btn" data-add="food">Добавить</button><span class="hint" id="af-msg" style="margin:0 0 0 6px"></span></div></section>`;
 }
 function activityCard(i){
@@ -1187,13 +1185,9 @@ function activityCard(i){
     <div class="pills" style="margin-top:8px"><button class="btn" data-add="act">Добавить</button><span class="hint" id="aa-msg" style="margin:0 0 0 6px"></span></div></section>`;
 }
 function addFood(){
-  const sel = document.getElementById("af-p").value, g = parseNum(document.getElementById("af-g").value), k = parseNum(document.getElementById("af-k").value),
-    nm = (document.getElementById("af-n").value || "").trim().slice(0, 60), msg = document.getElementById("af-msg");
-  let item = null;
-  if (k != null && k > 0 && k < 5000) item = { n: sel !== "" ? FOODS[+sel][0] : (nm || "Свой продукт"), g: g > 0 ? Math.round(g) : undefined, kcal: Math.round(k) };
-  else if (sel !== "" && g > 0 && g < 3000) item = { n: FOODS[+sel][0], g: Math.round(g), kcal: Math.round(FOODS[+sel][1] * g / 100) };
-  if (!item) { msg.textContent = sel === "" ? "Введите калории" : "Введите граммы"; return; }
-  if (item.g === undefined) delete item.g;
+  const k = parseNum(document.getElementById("af-k").value), nm = (document.getElementById("af-n").value || "").trim().slice(0, 60), msg = document.getElementById("af-msg");
+  if (!(k > 0 && k < 5000)) { msg.textContent = "Впишите килокалории"; return; }
+  const item = { n: nm || "Без названия", kcal: Math.round(k) };
   mutDay(S.sel, d => { d.extra = (d.extra || []).concat([item]); }); render();
 }
 function addAct(){
