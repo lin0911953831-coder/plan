@@ -263,7 +263,6 @@ function warnings(src){
   if (h.heart) out.push(["heart", HEALTH.heart, "Начинайте только после консультации с кардиологом или терапевтом. Интервалы заменены ходьбой, вернуть их можно после разрешения врача."]);
   if (h.diabetes) out.push(["diab", HEALTH.diabetes, "Питание и нагрузка влияют на сахар крови и дозы лекарств. Согласуйте план с эндокринологом и чаще проверяйте сахар в первые недели."]);
   if (h.joints) out.push(["joints", HEALTH.joints, "Покажитесь врачу или реабилитологу. Прыжки и бег исключены. При острой боли упражнение сразу прекращайте."]);
-  if (p.healthOther && String(p.healthOther).trim()) out.push(["other", "Другое: " + String(p.healthOther).trim(), "Обсудите план с врачом до начала: приложение не знает, как это состояние влияет на допустимую нагрузку и питание."]);
   if (h.chronic) out.push(["chronic", HEALTH.chronic, "Обсудите план с лечащим врачом: болезни и лекарства могут менять допустимую нагрузку и питание."]);
   if (b && b < 18.5) out.push(["low", "Вес ниже нормы", "ИМТ меньше 18,5. Худеть вам не нужно, поэтому цель «похудеть» заменена на «держать вес». Обсудите питание с врачом."]);
   if (b && b >= 35) out.push(["obese", "ИМТ 35 и выше", "При таком весе начните с консультации врача. Бег и прыжки исключены, интервалы делайте быстрой ходьбой или на велосипеде."]);
@@ -1103,7 +1102,6 @@ function vSetup(){
     <label class="chk" style="border-top:0"><input type="checkbox" data-h="ok" ${h.ok ? "checked" : ""}><span id="s-okl"><b>${p.sex === "f" ? "Я здорова" : "Я здоров"}:</b> болезней и ограничений нет</span></label>
     <div id="s-fem" style="${p.sex === "f" ? "" : "display:none"}">${chk("pregnant", "Беременность")}${chk("bf", "Кормлю грудью")}</div>
     ${Object.keys(HEALTH).map(k => chk(k, HEALTH[k])).join("")}
-    <div style="margin-top:10px"><label class="hint" for="s-ho" style="display:block;margin:0 0 6px">Другое</label><input id="s-ho" class="field sm" maxlength="150" placeholder="Например: астма, недавняя операция, грыжа" value="${esc(p.healthOther || "")}" autocomplete="off"></div>
     <div id="s-warn"></div>
     <label class="chk" id="s-ackw" style="display:none"><input type="checkbox" id="s-ack" ${p.ack ? "checked" : ""}><span><b>Я проконсультируюсь с врачом перед началом программы</b></span></label></section>
   <section class="card"><h2 class="stp">6. Старт</h2>
@@ -1122,7 +1120,7 @@ function readSetup(){
   const sex = on("s-sex") || "m"; if (sex !== "f") { delete health.pregnant; delete health.bf; }
   return { sex, job: on("s-job") || "sit", goal: on("s-goal") || "lose", pace: on("s-pace") || "mid", eq: (() => { const q = {}; document.querySelectorAll("[data-eq]").forEach(x => { if (x.checked) q[x.dataset.eq] = true; }); return q; })(), levelU: lu ? +lu.dataset.n : 2, levelL: lw ? +lw.dataset.n : 2,
     age: parseNum(g("s-age").value), height: parseNum(g("s-h").value), startWeight: parseNum(g("s-w").value),
-    testPush: parseNum(g("s-pu").value), testPull: parseNum(g("s-pl").value), testSquat: parseNum(g("s-sq").value), eqOther: (g("s-eqo").value || "").trim().slice(0, 100), healthOther: (g("s-ho").value || "").trim().slice(0, 150), health, ack: !!(g("s-ack") && g("s-ack").checked), d: parseKey(g("s-d").value) };
+    testPush: parseNum(g("s-pu").value), testPull: parseNum(g("s-pl").value), testSquat: parseNum(g("s-sq").value), eqOther: (g("s-eqo").value || "").trim().slice(0, 100), health, ack: !!(g("s-ack") && g("s-ack").checked), d: parseKey(g("s-d").value) };
 }
 function suggestLevels(pu, pl, sq){
   const ok = x => x != null && !Number.isNaN(x) && x >= 0;
@@ -1148,7 +1146,7 @@ function setupLive(){
   if (key !== lastSug) { lastSug = key;
     if (sg.u) document.querySelectorAll("#s-lvu .lvl").forEach(x => x.classList.toggle("on", +x.dataset.n === sg.u));
     if (sg.l) document.querySelectorAll("#s-lvl .lvl").forEach(x => x.classList.toggle("on", +x.dataset.n === sg.l)); }
-  const src = { sex: r.sex, age: r.age, height: r.height, startWeight: r.startWeight, health: r.sex === "f" ? r.health : Object.assign({}, r.health, { pregnant: false, bf: false }), goal: r.goal, levelU: r.levelU, levelL: r.levelL, healthOther: r.healthOther };
+  const src = { sex: r.sex, age: r.age, height: r.height, startWeight: r.startWeight, health: r.sex === "f" ? r.health : Object.assign({}, r.health, { pregnant: false, bf: false }), goal: r.goal, levelU: r.levelU, levelL: r.levelL };
   const list = (r.age > 0 && r.height > 0 && r.startWeight > 0) ? warnings(src) : warnings(Object.assign({}, src, { height: 0 }));
   document.getElementById("s-warn").innerHTML = warnCard(list, false);
   document.getElementById("s-ackw").style.display = list.length ? "" : "none";
@@ -1162,11 +1160,11 @@ function saveSetup(){
   if (!r.d) bad.push("дату старта");
   if (bad.length) { err.textContent = "Проверьте: " + bad.join(", ") + "."; return; }
   const np = { sex: r.sex, age: Math.round(r.age), height: Math.round(r.height), startWeight: Math.round(r.startWeight * 10) / 10, start: ymd(mondayOf(r.d)),
-    job: r.job, goal: r.goal, pace: r.pace, levelU: r.levelU, levelL: r.levelL, level: Math.round((r.levelU + r.levelL) / 2), eq: r.eq, eqOther: r.eqOther, healthOther: r.healthOther, place: undefined, health: r.health, ack: r.ack, v: 2 };
+    job: r.job, goal: r.goal, pace: r.pace, levelU: r.levelU, levelL: r.levelL, level: Math.round((r.levelU + r.levelL) / 2), eq: r.eq, eqOther: r.eqOther, healthOther: undefined, place: undefined, health: r.health, ack: r.ack, v: 2 };
   if (r.testPush != null && !Number.isNaN(r.testPush)) np.testPush = Math.round(r.testPush);
   if (r.testPull != null && !Number.isNaN(r.testPull)) np.testPull = Math.round(r.testPull);
   if (r.testSquat != null && !Number.isNaN(r.testSquat)) np.testSquat = Math.round(r.testSquat);
-  if (!r.health.ok && !ILL.some(k => r.health[k]) && !r.healthOther) { err.textContent = "В пункте 5 отметьте «" + (r.sex === "f" ? "Я здорова" : "Я здоров") + "» или то, что относится к вам."; return; }
+  if (!r.health.ok && !ILL.some(k => r.health[k]) && !r.health.pregnant && !r.health.bf) { err.textContent = "В пункте 5 отметьте «" + (r.sex === "f" ? "Я здорова" : "Я здоров") + "» или то, что относится к вам."; return; }
   if (!document.getElementById("s-terms").checked) { err.textContent = "Подтвердите в пункте 6, что вам есть 18 лет и вы принимаете условия."; return; }
   np.terms = ymd(new Date());
   if (warnings(np).length && !r.ack) { err.textContent = "Отметьте в пункте 5, что проконсультируетесь с врачом."; document.getElementById("s-ackw").scrollIntoView({ block: "center" }); return; }
@@ -1179,12 +1177,12 @@ const ILL = ["heart", "diabetes", "joints", "chronic"];
 document.addEventListener("change", e => {
   const t = e.target; if (!t.matches) return;
   if (t.matches("[data-h]") && t.checked) {
-    if (t.dataset.h === "ok") { ILL.forEach(k => { const x = document.querySelector('[data-h="' + k + '"]'); if (x) x.checked = false; }); const o = document.getElementById("s-ho"); if (o) o.value = ""; }
+    if (t.dataset.h === "ok") { ILL.forEach(k => { const x = document.querySelector('[data-h="' + k + '"]'); if (x) x.checked = false; }); }
     else if (ILL.includes(t.dataset.h)) { const x = document.querySelector('[data-h="ok"]'); if (x) x.checked = false; }
   }
   if (t.matches("[data-h], #s-ack")) setupLive();
 });
-document.addEventListener("input", e => { if (e.target.id === "s-ho" && e.target.value.trim()) { const x = document.querySelector('[data-h="ok"]'); if (x && x.checked) { x.checked = false; setupLive(); } } });
+
 
 /* ---------- steps from Apple Health via Shortcuts ---------- */
 const SHORTCUT = "Шаги для Здорового тела";
