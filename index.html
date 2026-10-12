@@ -1099,7 +1099,8 @@ function vSetup(){
     <div class="hint">Программа строится из турника, резинок, гантелей и веса тела. Другой инвентарь можно использовать вместо похожих упражнений по своему усмотрению.</div>
     <div class="hint">Гантели лучше разборные: вес нужно будет прибавлять. Резинки удобнее набором из 3–5 штук разной жёсткости. Без гантелей пригодится рюкзак, в который можно положить бутылки с водой.</div></section>
   <section class="card"><h2 class="stp">5. Здоровье</h2>
-    <div class="tip" style="margin-top:0">Отметьте, если что-то из этого про вас. От ответов зависят калории и нагрузка.</div>
+    <div class="tip" style="margin-top:0">Отметьте «здоров(а)» или то, что про вас. От ответов зависят калории и нагрузка.</div>
+    <label class="chk" style="border-top:0"><input type="checkbox" data-h="ok" ${h.ok ? "checked" : ""}><span id="s-okl"><b>${p.sex === "f" ? "Я здорова" : "Я здоров"}:</b> болезней и ограничений нет</span></label>
     <div id="s-fem" style="${p.sex === "f" ? "" : "display:none"}">${chk("pregnant", "Беременность")}${chk("bf", "Кормлю грудью")}</div>
     ${Object.keys(HEALTH).map(k => chk(k, HEALTH[k])).join("")}
     <div style="margin-top:10px"><label class="hint" for="s-ho" style="display:block;margin:0 0 6px">Другое</label><input id="s-ho" class="field sm" maxlength="150" placeholder="Например: астма, недавняя операция, грыжа" value="${esc(p.healthOther || "")}" autocomplete="off"></div>
@@ -1139,6 +1140,7 @@ function setupLive(){
   document.getElementById("s-pacew").style.display = r.goal === "lose" ? "" : "none";
   document.getElementById("s-paced").textContent = PACE_DESC[r.pace] || "";
   document.getElementById("s-fem").style.display = r.sex === "f" ? "" : "none";
+  const okl = document.getElementById("s-okl"); if (okl) okl.firstElementChild.textContent = (r.sex === "f" ? "Я здорова" : "Я здоров") + ":";
   const sg = suggestLevels(r.testPush, r.testPull, r.testSquat), key = sg.u + "|" + sg.l, parts = [];
   if (sg.u) parts.push("верх тела — ступень " + sg.u);
   if (sg.l) parts.push("ноги — ступень " + sg.l);
@@ -1164,6 +1166,7 @@ function saveSetup(){
   if (r.testPush != null && !Number.isNaN(r.testPush)) np.testPush = Math.round(r.testPush);
   if (r.testPull != null && !Number.isNaN(r.testPull)) np.testPull = Math.round(r.testPull);
   if (r.testSquat != null && !Number.isNaN(r.testSquat)) np.testSquat = Math.round(r.testSquat);
+  if (!r.health.ok && !ILL.some(k => r.health[k]) && !r.healthOther) { err.textContent = "В пункте 5 отметьте «" + (r.sex === "f" ? "Я здорова" : "Я здоров") + "» или то, что относится к вам."; return; }
   if (!document.getElementById("s-terms").checked) { err.textContent = "Подтвердите в пункте 6, что вам есть 18 лет и вы принимаете условия."; return; }
   np.terms = ymd(new Date());
   if (warnings(np).length && !r.ack) { err.textContent = "Отметьте в пункте 5, что проконсультируетесь с врачом."; document.getElementById("s-ackw").scrollIntoView({ block: "center" }); return; }
@@ -1172,7 +1175,16 @@ function saveSetup(){
   queueSave("profile"); render(); window.scrollTo(0, 0);
 }
 document.addEventListener("input", e => { if (e.target.closest && e.target.closest("#main") && document.getElementById("s-prev")) setupLive(); });
-document.addEventListener("change", e => { if (e.target.matches && e.target.matches("[data-h], #s-ack")) setupLive(); });
+const ILL = ["heart", "diabetes", "joints", "chronic"];
+document.addEventListener("change", e => {
+  const t = e.target; if (!t.matches) return;
+  if (t.matches("[data-h]") && t.checked) {
+    if (t.dataset.h === "ok") { ILL.forEach(k => { const x = document.querySelector('[data-h="' + k + '"]'); if (x) x.checked = false; }); const o = document.getElementById("s-ho"); if (o) o.value = ""; }
+    else if (ILL.includes(t.dataset.h)) { const x = document.querySelector('[data-h="ok"]'); if (x) x.checked = false; }
+  }
+  if (t.matches("[data-h], #s-ack")) setupLive();
+});
+document.addEventListener("input", e => { if (e.target.id === "s-ho" && e.target.value.trim()) { const x = document.querySelector('[data-h="ok"]'); if (x && x.checked) { x.checked = false; setupLive(); } } });
 
 /* ---------- steps from Apple Health via Shortcuts ---------- */
 const SHORTCUT = "Шаги для Здорового тела";
