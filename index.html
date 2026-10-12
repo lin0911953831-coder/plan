@@ -167,6 +167,7 @@ h2.stp{font-size:16px;margin-bottom:10px}
 .warncard{border-color:var(--fast);background:var(--fast-soft)} .warncard h2{color:var(--fast)}
 .addrow{margin-top:10px} select.field{appearance:auto;font-size:15px}
 .hlink{font-size:12px;font-weight:600;color:var(--muted);text-decoration:underline;padding:5px 2px;margin-top:8px}
+.terms p{margin:0 0 10px;font-size:14px;line-height:1.5}
 .hbtn{margin-top:8px;font-size:12px;font-weight:600;padding:5px 9px;border-radius:999px;background:var(--fast-soft);color:var(--fast)}
 .toast{position:fixed;left:16px;right:16px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:9;background:var(--text);color:var(--bg);padding:12px 14px;border-radius:14px;font-size:14px;opacity:0;transform:translateY(10px);transition:.2s;pointer-events:none;max-width:560px;margin:0 auto}
 .toast.on{opacity:1;transform:none}
@@ -1016,9 +1017,27 @@ function vProgress(){
   <section class="card"><table class="tbl"><tr><th>Нед.</th><th>Ср. вес</th><th>Изм.</th><th>Шаги</th><th>Тренировки</th></tr>${rows}</table>
     <div class="hint">Тренировка засчитывается, когда отмечены все её пункты. Выполнено ${doneW} из ${planW} на сегодня.</div></section>
   ${profileCard()}
+  <section class="card"><div class="tip" style="margin-top:0">Только для взрослых 18+. Рекомендации носят ознакомительный и добровольный характер и не заменяют консультацию врача. <button type="button" class="hlink" style="margin:0;padding:0" data-terms>Условия использования</button></div></section>
   ${settingsCard(sw)}`;
 }
 
+const TERMS_HTML = `<div class="terms">
+  <p><b>Только для взрослых.</b> Приложением могут пользоваться только люди, которым исполнилось 18 лет.</p>
+  <p><b>Это не медицинская помощь.</b> «Здоровое тело» — информационное приложение. Его авторы не врачи, не диетологи и не тренеры. Планы питания и тренировок, калории, пульс и другие цифры рассчитываются по общим формулам и готовым шаблонам. Это примерные ориентиры, а не диагноз, не лечение и не индивидуальная рекомендация специалиста.</p>
+  <p><b>Добровольно и на свой риск.</b> Все рекомендации носят ознакомительный и добровольный характер. Вы сами решаете, следовать ли им, и сами отвечаете за своё здоровье и за последствия выполнения упражнений и изменения питания.</p>
+  <p><b>Сначала врач.</b> Перед началом любой программы питания и тренировок рекомендуется проконсультироваться с врачом. Это обязательно при беременности и кормлении грудью, болезнях сердца и сосудов, давлении, диабете, болезнях суставов и спины, других хронических болезнях, приёме лекарств, а также при сильно повышенном или пониженном весе.</p>
+  <p><b>Слушайте тело.</b> Немедленно прекратите занятие и обратитесь за медицинской помощью, если появились боль в груди, головокружение, сильная одышка, резкая боль в суставе или спине, слабость или другое плохое самочувствие.</p>
+  <p><b>Без гарантий.</b> Результаты зависят от многих факторов и не гарантируются. Калорийность продуктов и расход энергии указаны приблизительно.</p>
+  <p><b>Данные.</b> Всё, что вы вводите, хранится только на вашем устройстве и никуда не отправляется.</p>
+  <p>Пользуясь приложением, вы подтверждаете, что вам есть 18 лет и вы согласны с этими условиями.</p></div>`;
+function vTerms(){
+  return `<section class="card hero"><div class="eyebrow">Перед началом</div><h1>Условия использования</h1>
+    <div class="muted small">Прочитайте и подтвердите, чтобы продолжить.</div></section>
+  <section class="card">${TERMS_HTML}
+    <label class="chk"><input type="checkbox" id="t-ok"><span><b>Мне исполнилось 18 лет. Я прочитал(а) условия, понимаю, что приложение не заменяет врача, и пользуюсь им добровольно, на свой риск.</b></span></label>
+    <div class="hint" id="t-err" style="color:var(--fast)"></div>
+    <div style="margin-top:10px"><button class="btn" data-acceptterms>Принимаю</button></div></section>`;
+}
 const SEX = { m: "Мужской", f: "Женский" };
 function warnCard(list, compact){
   if (!list.length) return "";
@@ -1086,10 +1105,11 @@ function vSetup(){
   <section class="card"><h2 class="stp">6. Старт</h2>
     ${lab("s-d", "Дата старта")}<input id="s-d" class="field sm" type="date" value="${esc(d)}">
     <div class="hint" id="s-prev"></div>
+    <label class="chk" style="margin-top:10px"><input type="checkbox" id="s-terms" ${S.profile.terms ? "checked" : ""}><span>Мне исполнилось 18 лет. Я понимаю, что приложение не заменяет врача, и пользуюсь им добровольно, на свой риск. <button type="button" class="hlink" style="margin:0;padding:0" data-terms>Условия использования</button></span></label>
     <div class="hint" id="s-err" style="color:var(--fast)"></div>
     <div class="pills" style="margin-top:12px;gap:8px"><button class="btn" data-setup="save">${first ? "Получить план" : "Сохранить"}</button>${first ? "" : '<button class="btn sec" data-setup="cancel">Отмена</button>'}</div></section>
   ${first ? setupExtra() : ""}
-  <section class="card"><div class="tip">Приложение подбирает план по формулам и готовым программам. Оно не заменяет врача, тренера и диетолога.</div></section>`;
+  <section class="card"><div class="tip">Только для взрослых 18+. Приложение подбирает план по общим формулам и готовым программам, его авторы не врачи. Все рекомендации носят ознакомительный и добровольный характер и не заменяют консультацию врача, тренера и диетолога. <button type="button" class="hlink" style="margin:0;padding:0" data-terms>Условия использования</button></div></section>`;
 }
 function readSetup(){
   const g = id => document.getElementById(id), on = id => { const b = document.querySelector("#" + id + " button.on"); return b ? b.dataset.v : null; };
@@ -1130,7 +1150,8 @@ function setupLive(){
 }
 function saveSetup(){
   const err = document.getElementById("s-err"), r = readSetup(), bad = [];
-  if (!(r.age >= 14 && r.age <= 90)) bad.push("возраст от 14 до 90");
+  if (r.age > 0 && r.age < 18) { err.textContent = "Приложение предназначено только для взрослых: пользоваться им можно с 18 лет."; return; }
+  if (!(r.age >= 18 && r.age <= 90)) bad.push("возраст от 18 до 90");
   if (!(r.height >= 120 && r.height <= 230)) bad.push("рост от 120 до 230 см");
   if (!(r.startWeight >= 35 && r.startWeight <= 300)) bad.push("вес от 35 до 300 кг");
   if (!r.d) bad.push("дату старта");
@@ -1140,6 +1161,8 @@ function saveSetup(){
   if (r.testPush != null && !Number.isNaN(r.testPush)) np.testPush = Math.round(r.testPush);
   if (r.testPull != null && !Number.isNaN(r.testPull)) np.testPull = Math.round(r.testPull);
   if (r.testSquat != null && !Number.isNaN(r.testSquat)) np.testSquat = Math.round(r.testSquat);
+  if (!document.getElementById("s-terms").checked) { err.textContent = "Подтвердите в пункте 6, что вам есть 18 лет и вы принимаете условия."; return; }
+  np.terms = ymd(new Date());
   if (warnings(np).length && !r.ack) { err.textContent = "Отметьте в пункте 5, что проконсультируетесь с врачом."; document.getElementById("s-ackw").scrollIntoView({ block: "center" }); return; }
   S.profile = Object.assign({}, S.profile, np); PG = null; MP = null;
   S.setup = false; S.sel = clampI(todayIdx()); S.tab = "today";
@@ -1310,6 +1333,7 @@ function render(){
   renderTabs(); syncUI();
   const main = document.getElementById("main");
   if (setup) { main.innerHTML = vSetup(); setupLive(); afterRender(); return; }
+  if (!S.profile.terms) { document.querySelector(".tabs").hidden = true; document.getElementById("strip").innerHTML = ""; main.innerHTML = vTerms(); return; }
   const v = { today: vToday, food: vFood, train: vTrain, steps: vSteps, progress: vProgress }[S.tab]();
   main.innerHTML = v;
   afterRender();
@@ -1404,6 +1428,9 @@ document.addEventListener("click", e => {
     render(); return; }
   if (ds.restoremeals != null) { mutDay(S.sel, d => { delete d.hidden; }); S.profile = Object.assign({}, S.profile, { hiddenMeals: {} }); queueSave("profile"); render(); return; }
   if (ds.example) { S.profile = Object.assign({}, S.profile, { noExample: ds.example === "off" }); queueSave("profile"); render(); return; }
+  if (ds.terms != null) { showModal("Условия использования", TERMS_HTML); return; }
+  if (ds.acceptterms != null) { const ok = document.getElementById("t-ok"); if (!ok || !ok.checked) { document.getElementById("t-err").textContent = "Поставьте галочку, чтобы продолжить."; return; }
+    S.profile = Object.assign({}, S.profile, { terms: ymd(new Date()) }); queueSave("profile"); render(); window.scrollTo(0, 0); return; }
   if (ds.hhelp != null) { showModal("Шаги из «Здоровья»", healthHelp()); return; }
   if (ds.modalclose != null) { closeModal(); return; }
   if (ds.delfood != null) { const k = +ds.delfood; mutDay(S.sel, d => { d.extra = (d.extra || []).filter((_, j) => j !== k); }); render(); return; }
