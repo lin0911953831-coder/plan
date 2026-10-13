@@ -1,4 +1,4 @@
-const CACHE = "plan-v30";
+const CACHE = "plan-v31";
 const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
@@ -9,7 +9,7 @@ self.addEventListener("activate", e => {
 self.addEventListener("fetch", e => {
   const req = e.request, url = new URL(req.url);
   if (req.method !== "GET" || url.origin !== self.location.origin) return;
-  if (req.mode === "navigate") {
+  if (req.mode === "navigate" && !/\.[a-z0-9]+$/i.test(url.pathname.replace(/index\.html$/, ""))) {
     // Свежая версия, если есть интернет; без сети или при медленной сети — из кэша.
     e.respondWith(caches.open(CACHE).then(c => {
       const net = fetch(req, { cache: "no-store" }).then(r => { if (r.ok) c.put("./index.html", r.clone()); return r; });
