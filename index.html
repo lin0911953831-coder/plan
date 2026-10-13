@@ -1030,6 +1030,9 @@ function vProgress(){
   <section class="card"><table class="tbl"><tr><th>Нед.</th><th>Ср. вес</th><th>Изм.</th><th>Шаги</th><th>Тренировки</th></tr>${rows}</table>
     <div class="hint">Тренировка засчитывается, когда отмечены все её пункты. Выполнено ${doneW} из ${planW} на сегодня.</div></section>
   ${profileCard()}
+  <section class="card"><h2 style="font-size:16px">Оформление</h2>
+    <div class="seg" style="margin-top:10px">${[["auto","Как в iPhone"],["light","Светлое"],["dark","Тёмное"]].map(([k, l]) => `<button class="${getTheme() === k ? "on" : ""}" data-theme="${k}">${l}</button>`).join("")}</div>
+    <div class="hint">«Как в iPhone» — меняется вместе с тёмным режимом телефона.</div></section>
   <section class="card"><div class="tip" style="margin-top:0">Только для взрослых 18+. Рекомендации носят ознакомительный характер и не заменяют консультацию врача. <button type="button" class="hlink" style="margin:0;padding:0" data-terms>Условия использования</button></div></section>
   ${settingsCard(sw)}`;
 }
@@ -1533,6 +1536,7 @@ document.addEventListener("click", e => {
   if (ds.terms != null) { showModal("Условия использования", TERMS_HTML); return; }
   if (ds.acceptterms != null) { const ok = document.getElementById("t-ok"); if (!ok || !ok.checked) { document.getElementById("t-err").textContent = "Поставьте галочку, чтобы продолжить."; return; }
     S.profile = Object.assign({}, S.profile, { terms: ymd(new Date()) }); queueSave("profile"); render(); window.scrollTo(0, 0); return; }
+  if (ds.theme) { try { localStorage.setItem("pp_theme", ds.theme); } catch (e) {} applyTheme(ds.theme); render(); return; }
   if (ds.remind != null) { remindModal(); return; }
   if (ds.ics) { doIcs(ds.ics); return; }
   if (ds.hhelp != null) { showModal("Шаги из «Здоровья»", healthHelp()); return; }
@@ -1574,6 +1578,17 @@ function applyField(el, delay){
 document.addEventListener("input", e => { if (e.target.matches("input[data-f]")) applyField(e.target, 900); });
 document.addEventListener("change", e => { if (e.target.matches("input[data-f]")) { applyField(e.target, 200); safeRender(); } });
 document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.matches("input[data-f]")) e.target.blur(); });
+
+/* ---------- theme ---------- */
+function getTheme(){ try { return localStorage.getItem("pp_theme") || "auto"; } catch (e) { return "auto"; } }
+function applyTheme(t){
+  const root = document.documentElement;
+  if (t === "light" || t === "dark") root.setAttribute("data-theme", t); else root.removeAttribute("data-theme");
+  const dark = t === "dark" || (t !== "light" && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => { m.setAttribute("content", dark ? "#0e0f11" : "#ffffff"); m.removeAttribute("media"); });
+}
+applyTheme(getTheme());
+if (window.matchMedia) { try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => applyTheme(getTheme())); } catch (e) {} }
 
 /* ---------- day change while the app stays open ---------- */
 let lastTodayKey = "";
