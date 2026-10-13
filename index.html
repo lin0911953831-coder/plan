@@ -629,7 +629,7 @@ function plan(i){
     const L = e.goal === "gain" ? ["А","Б","А","Б"][P.sIdx[dow]] : (w % 2 ? ["А","Б","А"] : ["Б","А","Б"])[P.sIdx[dow]];
     const items = [{ k: "t0", name: "Разминка", task: P.warm }].concat(strengthItems(P, w, L), [{ k: "t7", name: "Заминка", task: D.cooldown }]);
     return { type: "strength", title: "Силовая " + L, time: "20:00–" + hhmm(20*60 + P.dur), dur: P.dur + " мин", pulse: z.strength,
-      inten: e.level === 1 ? "6–7 из 10" : "7–8 из 10", items };
+      inten: e.level === 1 ? "средняя: тяжело, но не до предела" : "тяжело: последние 2–3 повтора даются с трудом", items };
   }
   if (type === "I" || type === "I+") {
     const [r, f, s] = P.ivs[w-1], total = 10 + r * (f + s), sat = dow === 5;
@@ -640,12 +640,12 @@ function plan(i){
       { k: "t2", name: "Заминка, 5 минут", task: "Спокойная ходьба и растяжка ног." }];
     if (type === "I+") items.push({ k: "t3", name: "Длинная прогулка, 60 минут", task: "Можно заменить бассейном или велосипедом. Пульс " + z.walk + "." });
     return { type: "interval", title: type === "I+" ? "Интервалы и прогулка" : "Интервалы", time: sat ? "Днём" : "20:00–" + hhmm(20*60 + Math.round(total)),
-      dur: num(total) + " мин", pulse: z.fast, inten: "8 на быстрых, 4 на спокойных", items, iv: { r, f, s, total }, mode: P.ivMode };
+      dur: num(total) + " мин", pulse: z.fast, inten: "быстро — тяжело, говорить трудно; спокойно — отдыхаете, можно разговаривать", items, iv: { r, f, s, total }, mode: P.ivMode };
   }
   if (type === "W") { const d = e.level === 1 ? "30–40" : "45–60";
-    return { type: "walk", title: "Ходьба", time: "В любое время", dur: d + " мин", pulse: z.walk, inten: "3–4 из 10",
+    return { type: "walk", title: "Ходьба", time: "В любое время", dur: d + " мин", pulse: z.walk, inten: "лёгкая: можно спокойно разговаривать",
       items: [{ k: "t0", name: `Ходьба ${d} минут`, task: "Спокойный темп, можно разбить на 2–3 прогулки. День восстановления." }] }; }
-  if (type === "A") return { type: "walk", title: "Активный отдых", time: "Днём", dur: "60 мин", pulse: z.walk, inten: "3–4 из 10",
+  if (type === "A") return { type: "walk", title: "Активный отдых", time: "Днём", dur: "60 мин", pulse: z.walk, inten: "лёгкая: можно спокойно разговаривать",
     items: [{ k: "t0", name: "Длинная прогулка, бассейн или велосипед, 60 минут", task: "Спокойный темп, пульс " + z.walk + "." }] };
   return { type: "rest", title: "Отдых", time: "", dur: "", items: [
     { k: "t0", name: "Лёгкая прогулка", task: "Без нагрузки, просто подвигаться." },
@@ -945,7 +945,7 @@ function vTrain(){
     <div class="eyebrow">${WD[i%7]}, ${fmtDate(i)} · неделя ${w}${w === 6 || w === 12 ? " · разгрузка" : ""}</div>
     <div class="rowh" style="margin-top:4px"><h2 style="font-size:21px">${esc(p.title)}</h2><span class="pill ${td.full ? "g" : ""}">${td.n} из ${td.of}</span></div>
     <div class="pills">${p.time ? `<span class="pill">${esc(p.time)}</span>` : ""}${p.dur ? `<span class="pill">${esc(p.dur)}</span>` : ""}
-      ${p.pulse ? `<span class="pill r">пульс ${p.pulse}</span>` : ""}${p.inten ? `<span class="pill o">Интенсивность: ${esc(p.inten)}</span>` : ""}</div>
+      ${p.pulse ? `<span class="pill r">пульс ${p.pulse}</span>` : ""}${p.inten ? `<span class="pill o">Нагрузка: ${esc(p.inten)}</span>` : ""}</div>
     ${p.type === "strength" ? `<div class="tip">${esc(program().focus[w-1])}</div>` : ""}
     ${p.type === "interval" ? `<div class="tip">Где: ${esc(p.mode)}.${program().e.noRun ? " Бег и прыжки вам пока не нужны: лишняя нагрузка на суставы." : ""}</div><div id="itimer"></div>` : ""}
     ${p.type === "rest" ? `<div class="tip">Силовых нет. Шаги всё равно по цели.</div>` : ""}
