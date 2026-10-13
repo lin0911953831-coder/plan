@@ -115,6 +115,7 @@ main{padding:14px 0 110px}
 .ing td.n,.ing th.n{text-align:right;white-space:nowrap;padding-left:10px;font-variant-numeric:tabular-nums}
 details{margin-top:6px} summary{cursor:pointer;color:var(--accent);font-size:13px;font-weight:600;list-style:none}
 summary::-webkit-details-marker{display:none}
+.isteps{margin:8px 0 2px;padding-left:20px;font-size:14px;line-height:1.45} .isteps li{margin:4px 0}
 summary::after{content:" ▾"} details[open] summary::after{content:" ▴"}
 .tip{font-size:14px;color:var(--muted);margin-top:6px}
 .restbtn{margin-top:8px;font-size:13px;font-weight:600;padding:5px 10px;border-radius:999px;background:var(--calm-soft);color:var(--calm)}
@@ -1082,6 +1083,7 @@ function vSetup(){
   const chk = (k, t) => `<label class="chk"><input type="checkbox" data-h="${k}" ${h[k] ? "checked" : ""}><span>${esc(t)}</span></label>`;
   return `<section class="card hero"><div class="eyebrow">${first ? "Первый запуск" : "Параметры"}</div><h1>${first ? "Подберём план под вас" : "Изменить план"}</h1>
     <div class="muted small">Шесть коротких шагов. По ответам приложение посчитает калории и граммовки, подберёт упражнения и нагрузку. Всё хранится только на этом устройстве.</div></section>
+  ${first && !IS_STANDALONE ? installCard(true) : ""}
   <section class="card"><h2 class="stp">1. О себе</h2>
     ${lab("", "Пол")}${seg("s-sex", SEX, p.sex === "f" ? "f" : "m")}
     <div class="grid2" style="margin-top:12px">
@@ -1201,6 +1203,35 @@ document.addEventListener("change", e => {
 /* ---------- steps from Apple Health via Shortcuts ---------- */
 const SHORTCUT = "Шаги";
 const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const IS_ANDROID = /Android/i.test(navigator.userAgent);
+const IS_STANDALONE = (() => { try { return matchMedia("(display-mode: standalone)").matches || navigator.standalone === true; } catch (e) { return false; } })();
+let installEvt = null;
+const instBtn = () => installEvt && !IS_STANDALONE ? '<div style="margin-top:10px"><button class="btn" data-install>Установить приложение</button></div>' : "";
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; document.querySelectorAll(".inst-btn").forEach(x => { x.innerHTML = instBtn(); }); });
+window.addEventListener("appinstalled", () => { installEvt = null; toast("Готово! Иконка появилась на экране телефона."); });
+function installSteps(os){
+  const li = a => `<ol class="isteps">${a.map(x => `<li>${x}</li>`).join("")}</ol>`;
+  if (os === "ios") return li([
+    "Откройте ссылку в <b>Safari</b>. Из Telegram или WhatsApp нажмите «Открыть в Safari».",
+    "Нажмите <b>«Поделиться»</b>: квадрат со стрелкой вверх. Если его не видно, сначала нажмите <b>«⋯»</b> внизу справа.",
+    "Пролистайте вниз и выберите <b>«На экран «Домой»»</b>.",
+    "Нажмите <b>«Добавить»</b>. Иконка «Здоровое тело» появится на экране."]);
+  return li([
+    "Откройте ссылку в <b>Chrome</b>. Из Telegram или WhatsApp нажмите «⋮» → «Открыть в браузере».",
+    "Нажмите <b>«⋮»</b> вверху справа.",
+    "Выберите <b>«Добавить на гл. экран»</b> или <b>«Установить приложение»</b>, затем «Установить».",
+    "В Samsung Internet: «≡» внизу → «Добавить страницу на» → «Главный экран». В других браузерах ищите в меню «На главный экран» или «Добавить ярлык»."]);
+}
+function installCard(first){
+  const mine = IS_IOS ? "ios" : IS_ANDROID ? "android" : "";
+  const block = (os, title) => `<details ${os === mine && !IS_STANDALONE ? "open" : ""}><summary>${title}</summary>${installSteps(os)}</details>`;
+  return `<section class="card"><h2 style="font-size:16px">📲 Иконка на экране телефона</h2>
+    <div class="tip">${IS_STANDALONE ? "Приложение уже установлено ✓ Инструкция пригодится, если захотите поделиться с друзьями."
+      : "Установите приложение на экран — оно будет открываться как обычное, без браузера, и работать без интернета."
+        + (first && IS_IOS ? " <b>Сделайте это до заполнения</b>: в Safari и в иконке на iPhone данные хранятся отдельно." : "")}</div>
+    <div class="inst-btn">${instBtn()}</div>
+    ${mine === "android" ? block("android", "Android") + block("ios", "iPhone") : block("ios", "iPhone") + block("android", "Android")}</section>`;
+}
 function healthHelp(){
   const step = (n, t, d) => `<div class="hs"><b class="hn">${n}</b><div><div class="ht">${t}</div>${d ? `<div class="hd">${d}</div>` : ""}</div></div>`;
   return `<div class="tip" style="margin-top:0">Сайты не могут сами читать «Здоровье», поэтому один раз сделаем маленькую команду в приложении <b>«Команды»</b> (оно есть на каждом iPhone). Это 2 минуты.</div>
@@ -1432,16 +1463,18 @@ function addAct(){
 function vSettings(){
   const sw = S.profile.startWeight || 80, th = getTheme();
   return `<section class="card hero"><h1>Настройки</h1><div class="muted small">План, оформление, напоминания и данные — в одном месте.</div></section>
+  ${IS_STANDALONE ? "" : installCard(false)}
   ${profileCard()}
   <section class="card"><h2 style="font-size:16px">Оформление</h2>
     <div class="seg" style="margin-top:10px">${[["light","☀️ Светлое"],["dark","🌙 Тёмное"]].map(([k, l]) => `<button class="${th === k ? "on" : ""}" data-theme="${k}">${l}</button>`).join("")}</div></section>
   <section class="card"><h2 style="font-size:16px">Напоминания</h2>
-    <div class="tip">Приёмы пищи, вода и тренировки в Календаре iPhone — придут уведомлениями, даже когда приложение закрыто.</div>
+    <div class="tip">Приёмы пищи, вода и тренировки в календаре телефона — придут уведомлениями, даже когда приложение закрыто.</div>
     <div style="margin-top:10px"><button class="btn sec" data-remind>🔔 Напоминания в Календарь</button></div></section>
   ${IS_IOS ? `<section class="card"><h2 style="font-size:16px">Шаги из «Здоровья»</h2>
     <div class="tip">Один раз настройте команду «Шаги» — потом шаги подставляются кнопкой «♥ Из «Здоровья»».</div>
     <div style="margin-top:10px"><button class="btn sec" data-hhelp>Как настроить</button></div></section>` : ""}
   ${settingsCard(sw)}
+  ${IS_STANDALONE ? installCard(false) : ""}
   <section class="card"><div class="tip" style="margin-top:0">Только для взрослых 18+. Рекомендации носят ознакомительный характер и не заменяют консультацию врача. <button type="button" class="hlink" style="margin:0;padding:0" data-terms>Условия использования</button></div></section>`;
 }
 
@@ -1556,6 +1589,7 @@ document.addEventListener("click", e => {
     S.profile = Object.assign({}, S.profile, { terms: ymd(new Date()) }); queueSave("profile"); render(); window.scrollTo(0, 0); return; }
   if (ds.theme) { try { localStorage.setItem("pp_theme", ds.theme); } catch (e) {} applyTheme(ds.theme); render(); return; }
   if (ds.remind != null) { remindModal(); return; }
+  if (ds.install != null) { if (installEvt) { const ev = installEvt; installEvt = null; ev.prompt(); document.querySelectorAll(".inst-btn").forEach(x => { x.innerHTML = ""; }); } return; }
   if (ds.ics) { doIcs(ds.ics); return; }
   if (ds.hhelp != null) { showModal("Шаги из «Здоровья»", healthHelp()); return; }
   if (ds.modalclose != null) { closeModal(); return; }
