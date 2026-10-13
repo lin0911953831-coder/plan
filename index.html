@@ -1484,7 +1484,20 @@ document.addEventListener("input", e => { if (e.target.matches("input[data-f]"))
 document.addEventListener("change", e => { if (e.target.matches("input[data-f]")) { applyField(e.target, 200); safeRender(); } });
 document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.matches("input[data-f]")) e.target.blur(); });
 
+/* ---------- day change while the app stays open ---------- */
+let lastTodayKey = "";
+function checkNewDay(){
+  if (!S.profile.start) return;
+  const k = ymd(new Date());
+  if (!lastTodayKey) { lastTodayKey = k; return; }
+  if (k !== lastTodayKey) { lastTodayKey = k; S.sel = clampI(todayIdx()); safeRender(); }
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkNewDay(); });
+window.addEventListener("focus", checkNewDay);
+window.addEventListener("pageshow", checkNewDay);
+setInterval(checkNewDay, 60000);
 /* ---------- boot ---------- */
+setTimeout(checkNewDay, 0);
 window.__plan = { program, nutrition, mealPlan, plan, foodTotals, warnings, burned };
 boot();
 })();
