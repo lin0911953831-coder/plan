@@ -164,6 +164,7 @@ svg.chart{width:100%;height:auto;display:block}
 .tabs button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 9px;font-size:11px;color:var(--muted);font-weight:600}
 .tabs svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .tabs button.on{color:var(--accent)}
+.hbtn.pend{background:var(--accent);color:#fff;border-color:var(--accent)}
 .tabs button{white-space:nowrap;overflow-wrap:normal;min-width:0} .brand b{white-space:nowrap}
 @media (max-width:370px){.chip .tl{font-size:8px;letter-spacing:-.02em} .tabs button{font-size:10px;letter-spacing:-.02em} .brand b{font-size:16px} .sync>span{display:none}}
 .empty{padding:22px 10px;text-align:center;color:var(--muted);font-size:14px}
@@ -847,7 +848,7 @@ function vToday(){
       <input id="f-s" class="field" inputmode="numeric" autocomplete="off" placeholder="—" data-f="steps" data-i="${i}" value="${d.steps != null ? d.steps : ""}">
       <div class="bar ${d.steps != null && d.steps < g ? "warn" : ""}"><i style="width:${stepsPct}%"></i></div>
       <div class="hint">Цель ${int(g)}${d.steps != null ? (d.steps >= g ? " · выполнено" : " · осталось " + int(g - d.steps)) : ""}</div>
-      ${IS_IOS ? '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button class="hbtn" data-health>♥ Из «Здоровья»</button><button class="hlink" data-hhelp>Как настроить?</button></div>' : ""}</div>
+      ${IS_IOS ? `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button class="hbtn${healthPending() ? " pend" : ""}" data-health>${healthPending() ? "📋 Вставить шаги" : "♥ Из «Здоровья»"}</button><button class="hlink" data-hhelp>Как настроить?</button></div>` : ""}</div>
   </div>
   <button class="card link" data-go="train">
     <div class="rowh"><div><div class="eyebrow">Тренировка</div><h2 style="margin-top:3px">${esc(p.title)}</h2></div>
@@ -979,7 +980,7 @@ function vSteps(){
       <div class="stat"><small>Всего</small><b>${cnt ? int(sum) : "—"}</b></div>
       <div class="stat"><small>Внесено дней</small><b>${cnt}</b></div>
     </div></section>
-  <section class="card">${rows}${IS_IOS ? '<div class="pills" style="margin-top:10px;gap:8px"><button class="btn sec" data-health>♥ Шаги за сегодня из «Здоровья»</button><button class="btn sec" data-hhelp>Как настроить</button></div>' : ""}
+  <section class="card">${rows}${IS_IOS ? `<div class="pills" style="margin-top:10px;gap:8px"><button class="btn ${healthPending() ? "" : "sec"}" data-health>${healthPending() ? "📋 Вставить шаги" : "♥ Шаги за сегодня из «Здоровья»"}</button><button class="btn sec" data-hhelp>Как настроить</button></div>` : ""}
     <details style="margin-top:10px"><summary>Как подключить «Здоровье» на iPhone</summary>${healthHelp()}</details><div class="hint">Шаги смотрите в приложении телефона или часов и вносите вечером.</div></section>
   <div class="sec-title">${WD[S.sel%7]}, ${fmtDate(S.sel)}</div>
   ${activityCard(S.sel)}
@@ -1247,11 +1248,12 @@ function healthHelp(){
     ${step(7, "Проверьте: нажмите ▶ внизу справа", "Разрешите доступ к «Здоровью». Внизу должно появиться число шагов за сегодня. Потом выйдите стрелкой «‹» — команда сохранится сама.")}
   </div>
   <div class="tip"><b>Показывает 0?</b> Откройте «Настройки» → «Здоровье» → «Доступ к данным и устройства» → «Команды» и в блоке <b>«Разрешить чтение приложению «Команды»»</b> включите <b>Шаги</b>.</div>
-  <div class="tip"><b>Каждый день:</b> нажмите «♥ Из «Здоровья»» → откроются «Команды» → вернитесь в приложение → нажмите «♥ Из «Здоровья»» ещё раз. Шаги подставятся сами.</div>
+  <div class="tip"><b>Каждый день:</b> нажмите «♥ Из «Здоровья»» → откроются «Команды» и скопируют шаги → вернитесь в приложение (кнопка «◀» слева вверху) → кнопка станет «📋 Вставить шаги», нажмите её. Если iPhone спросит про вставку, нажмите «Вставить».</div>
   <div class="tip">Не хотите настраивать — просто посмотрите шаги в приложении «Здоровье» и впишите число в поле «Шаги».</div>`;
 }
 const HASK = "pp_hask";
 const healthAskedAt = () => { try { return +localStorage.getItem(HASK) || 0; } catch (e) { return 0; } };
+const healthPending = () => Date.now() - healthAskedAt() < 15 * 60000;
 async function healthSteps(){
   let txt = "";
   try { if (navigator.clipboard && navigator.clipboard.readText) txt = await navigator.clipboard.readText(); } catch (e) {}
@@ -1262,18 +1264,19 @@ async function healthSteps(){
   if (m) { v = parseFloat(m[1].replace(/\s/g, "").replace(",", ".")); if (m[2]) i = idxOfKey(m[2]); }
   else if (recent && /^[\d\s\u00a0.,]+$/.test(txt)) v = parseFloat(txt.replace(/[\s\u00a0]/g, "").replace(",", "."));
   if (v != null && isFinite(v) && v >= 0 && v < 100000 && i >= 0 && i < DAYS) {
-    v = Math.round(v); mutDay(i, d => { d.steps = v; }); S.sel = i; render(); toast("Шаги за " + fmtDate(i) + ": " + int(v));
     try { localStorage.removeItem(HASK); } catch (e) {}
+    v = Math.round(v); mutDay(i, d => { d.steps = v; }); S.sel = i; render(); toast("Шаги за " + fmtDate(i) + ": " + int(v));
     try { await navigator.clipboard.writeText(""); } catch (e) {}
     return;
   }
-  if (recent) { showModal("Шаги не пришли", '<div class="tip" style="margin-top:0">Похоже, команда «Шаги» ещё не настроена или называется иначе.</div>' + healthHelp()); try { localStorage.removeItem(HASK); } catch (e) {} return; }
+  if (recent) { showModal("Шаги не пришли", '<div class="tip" style="margin-top:0">Похоже, команда «Шаги» ещё не настроена или называется иначе.</div>' + healthHelp()); try { localStorage.removeItem(HASK); } catch (e) {} render(); return; }
   try { localStorage.setItem(HASK, String(Date.now())); } catch (e) {}
-  toast("Открываю «Команды». Потом вернитесь и нажмите «♥ Из «Здоровья»» ещё раз.");
+  render();
+  toast("Открываю «Команды». Потом вернитесь и нажмите «📋 Вставить шаги».");
   setTimeout(() => { location.href = "shortcuts://run-shortcut?name=" + encodeURIComponent(SHORTCUT); }, 600);
 }
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && Date.now() - healthAskedAt() < 15 * 60000) toast("Нажмите «♥ Из «Здоровья»», чтобы вставить шаги.");
+  if (document.visibilityState === "visible" && healthPending()) { safeRender(); toast("Нажмите «📋 Вставить шаги»."); }
 });
 const idxOfKey = k => { const d = parseKey(k); return d ? Math.round((d - startDate()) / 864e5) : -1; };
 function showModal(title, html, noOk){ closeModal(); const m = document.createElement("div"); m.className = "modal"; m.id = "modal";
