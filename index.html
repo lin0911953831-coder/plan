@@ -109,6 +109,7 @@ main{padding:14px 0 110px}
 .item.on .t{color:var(--muted)}
 .task{font-size:15px;margin-top:3px;color:var(--text)}
 .time{font-size:12px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.tbtn{padding:0 0 1px;background:none;border:0;border-bottom:1px dashed currentColor;border-radius:0;font:inherit;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer}
 .ing{width:100%;border-collapse:collapse;font-size:14px;margin-top:6px}
 .ing td,.ing th{padding:6px 0;border-top:1px solid var(--line);vertical-align:top}
 .ing th{font-size:12px;color:var(--muted);font-weight:600;text-align:left;border-top:0}
@@ -673,7 +674,17 @@ function meals(i){
     { k: "m10", time: "19:30–20:00", title: "Вечерний приём", kcal: M.ck, prot: M.cp, lines: [["Творог 5%", M.curd + " г"], ["Яблоко или ягоды", "150 г"]] }]);
   if (p.type === "strength" || p.type === "interval")
     L.push({ k: "m11", time: /^20/.test(p.time) ? "20:00" : "На тренировке", water: true, title: "Вода на тренировке", sub: "450 мл небольшими глотками", ml: 450 });
-  return L.concat(M.extras.filter(x => x.k === "x2"));
+  return applyTimes(i, L.concat(M.extras.filter(x => x.k === "x2")));
+}
+/* Своё время для пунктов меню: на один день (day.times) или для всех дней (profile.mealTimes). */
+const tkey = t => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ""); return m ? +m[1] * 60 + +m[2] : null; };
+const normT = v => { const m = /^(\d{1,2}):(\d{2})/.exec(v || ""); return m && +m[1] < 24 && +m[2] < 60 ? hhmm(+m[1] * 60 + +m[2]) : null; };
+const nowT = () => { const d = new Date(); return hhmm(d.getHours() * 60 + d.getMinutes()); };
+const pad2 = t => { const k = tkey(t); return k == null ? "" : String(Math.floor(k / 60)).padStart(2, "0") + ":" + String(k % 60).padStart(2, "0"); };
+function applyTimes(i, L){
+  const dt = day(i).times || {}, pt = S.profile.mealTimes || {};
+  return L.map(x => { const t = dt[x.k] || pt[x.k]; if (!t) return x;
+    return Object.assign({}, x, { orig: x.time, time: t, custom: dt[x.k] ? "day" : "all" }); });
 }
 
 function visibleMeals(i){
@@ -787,7 +798,8 @@ function boot() {
   const saved = LS.get("pp_data", null);
   if (saved) { S.days = saved.days || {}; S.profile = saved.profile || {}; }
   S.loaded = true; S.mode = "phone"; S.sel = clampI(todayIdx());
-  persist(); render(); renderBanner(); requestAnimationFrame(() => scrollFood());
+  try { history.scrollRestoration = "manual"; } catch (e) {}
+  persist(); render(); renderBanner(); requestAnimationFrame(() => scrollFood()); setTimeout(scrollFood, 250);
   if ("serviceWorker" in navigator) setupUpdates();
 }
 /* Обновления: при каждом возврате в приложение тихо проверяем новую версию и перезагружаемся, когда это никому не мешает. */
@@ -893,7 +905,15 @@ function goalRules(){
 function vFood(){
   const i = S.sel, d = day(i), c = d.meals || {}, ft = foodTotals(i), m = visibleMeals(i), w = weekOf(i), hid = hiddenCount(i), noEx = !!S.profile.noExample;
   const cookW = (i % 7 === 6 && w < 12) ? w + 1 : w, MPl = mealPlan(), dw = MPl.weeks[(cookW-1) % 4];
-  const items = m.map(x => {
+  let prevKey = 0;
+  const rows = m.map((x, n) => { const kk = tkey(x.time); prevKey = kk == null ? prevKey : kk; return { x, key: prevKey, n }; })
+    .concat(extraFood(i).map((x, k) => ({ x, ex: true, k, key: x.t ? tkey(x.t) : 24 * 60, n: 1000 + k })))
+    .sort((a, b) => a.key - b.key || a.n - b.n);
+  const items = rows.map(r => { const x = r.x;
+    if (r.ex) { const k = r.k, on = x.done !== false;
+      return `<div class="item ${on ? "on" : ""}"><button class="ck ${on ? "on" : ""}" data-xmeal="${k}" aria-label="Отметить">${CHECK}</button>
+      <div><div class="rowh"><div><button type="button" class="time tbtn" data-tedit="x:${k}">${esc(x.t || "Доп.")}</button> <span class="t">${esc(x.n)}${x.g ? `<span class="muted" style="font-weight:500">, ${x.g} ${unitOf(x)}</span>` : ""}</span></div>
+      <span style="display:flex;gap:6px;align-items:center"><span class="pill">${int(x.kcal)} ккал</span><button class="xbtn" data-delfood="${k}" aria-label="Убрать из меню">×</button></span></div></div></div>`; }
     const on = !!c[x.k];
     let body = "";
     if (x.lines) body = `<table class="ing">${x.lines.map(r => `<tr><td>${esc(r[0])}</td><td class="n">${esc(r[1])}</td></tr>`).join("")}</table>`;
@@ -901,17 +921,14 @@ function vFood(){
       <div class="tip">Граммы для сырых продуктов и сухой крупы. Готовое блюдо делите на 7 равных порций по весу.</div></details>`;
     if (x.water) body = `<div class="d">${esc(x.sub)}</div>`;
     return `<div class="item ${on ? "on" : ""}"><button class="ck ${x.water ? "wt" : ""} ${on ? "on" : ""}" data-meal="${x.k}" aria-label="Отметить">${CHECK}</button>
-      <div><div class="rowh"><div><span class="time">${esc(x.time)}</span> <span class="t">${esc(x.title)}</span></div>
+      <div><div class="rowh"><div><button type="button" class="time tbtn" data-tedit="m:${x.k}">${esc(x.time)}</button> <span class="t">${esc(x.title)}</span></div>
       <span style="display:flex;gap:6px;align-items:center">${x.kcal ? `<span class="pill">${x.kcal} ккал</span>` : `<span class="pill w">${x.ml} мл</span>`}<button class="xbtn" data-hidemeal="${x.k}" aria-label="Убрать пункт">×</button></span></div>${body}</div></div>`;
-  }).join("") + extraFood(i).map((x, k) => { const on = x.done !== false;
-    return `<div class="item ${on ? "on" : ""}"><button class="ck ${on ? "on" : ""}" data-xmeal="${k}" aria-label="Отметить">${CHECK}</button>
-      <div><div class="rowh"><div><span class="time">Доп.</span> <span class="t">${esc(x.n)}${x.g ? `<span class="muted" style="font-weight:500">, ${x.g} ${unitOf(x)}</span>` : ""}</span></div>
-      <span style="display:flex;gap:6px;align-items:center"><span class="pill">${int(x.kcal)} ккал</span><button class="xbtn" data-delfood="${k}" aria-label="Убрать из меню">×</button></span></div></div></div>`; }).join("");
+  }).join("");
   return `
   <section class="card">
     <div class="eyebrow">${WD[i%7]}, ${fmtDate(i)}</div>
     <h2 style="font-size:19px;margin-top:4px">${noEx ? "Ваше меню на день" : "Пример плана питания на день"}</h2>
-    <div class="tip">${noEx ? "Пример плана убран. Добавляйте свою еду через «+ Добавить продукт» или «Поиск продуктов»." : "Это пример, а не обязательное меню. Ненужные пункты убирайте крестиком, свою еду добавляйте ниже через «+ Добавить продукт» или «Поиск продуктов»."}</div>
+    <div class="tip">${noEx ? "Пример плана убран. Добавляйте свою еду через «+ Добавить продукт в меню» или «Поиск продуктов для меню»." : "Это пример, а не обязательное меню. Ненужные пункты убирайте крестиком, свою еду добавляйте ниже через «+ Добавить продукт в меню» или «Поиск продуктов для меню». Время любого пункта можно поменять, нажав на него."}</div>
     <div class="pills" style="margin-top:10px;gap:8px"><button class="btn sec" data-remind>🔔 Напоминания</button>${noEx ? '<button class="btn sec" data-example="on">Вернуть пример плана</button>' : '<button class="btn sec" data-example="off">Убрать весь пример</button>'}${hid && !noEx ? `<button class="btn sec" data-restoremeals>Вернуть скрытые пункты (${hid})</button>` : ""}</div>
     <div class="grid4" style="margin-top:12px">
       <div class="stat"><small>Калории</small><b>${int(ft.kcal)}</b><small>из ${int(nutrition().t)}</small></div>
@@ -923,7 +940,7 @@ function vFood(){
     <div class="hint">${esc(nutritionText())}</div>
   </section>
   <section class="card"><div class="list">${items}</div>
-    <div class="pills" style="margin-top:12px;gap:8px"><button class="btn sec" data-fpanel="add">+ Добавить продукт</button><button class="btn sec" data-fpanel="search">🔍 Поиск продуктов</button></div>
+    <div class="pills" style="margin-top:12px;gap:8px"><button class="btn sec" data-fpanel="add">+ Добавить продукт в меню</button><button class="btn sec" data-fpanel="search">🔍 Поиск продуктов для меню</button></div>
     ${foodPanel()}
     <div class="hint" style="margin-top:10px">После 21:30 только пара глотков воды при жажде.</div></section>
   ${noEx ? "" : `<div class="sec-title">${cookW !== w ? "Готовка сегодня на неделю " + cookW : "Готовка на неделю " + w}</div>
@@ -1414,10 +1431,12 @@ function foodPanel(){
     <div class="grid2" style="margin-top:8px">
       <div><label class="hint" for="af-k" style="display:block;margin:0 0 6px">Ккал на 100 г</label><input id="af-k" class="field sm" inputmode="decimal" placeholder="Есть на упаковке" autocomplete="off"></div>
       <div><label class="hint" for="af-g" style="display:block;margin:0 0 6px">Сколько съели, г</label><input id="af-g" class="field sm" inputmode="numeric" placeholder="Например, 150" autocomplete="off"></div></div>
+    <div style="margin-top:8px"><label class="hint" for="af-t" style="display:block;margin:0 0 6px">Во сколько</label><input id="af-t" class="field sm" type="time" value="${pad2(nowT())}"></div>
     <div class="calc" id="af-sum">Калорийность порции посчитается сама: граммы × ккал на 100 г.</div>
     <label class="chk" style="border-top:0"><input type="checkbox" id="af-save" checked><span>Сохранить в архив, чтобы потом найти через поиск</span></label>
     <div class="pills" style="gap:8px"><button class="btn" data-add="food">Добавить в меню</button><button class="btn sec" data-fpanel="">Закрыть</button><span class="hint" id="af-msg" style="margin:0"></span></div></div>`;
   if (S.fpanel === "search") return `<div class="fpanel"><label class="hint" for="fs-q" style="display:block;margin:0 0 6px">Поиск продуктов из архива</label><input id="fs-q" class="field sm" placeholder="Например: хлеб, банан, кефир" autocomplete="off">
+    <div style="margin-top:8px;display:flex;align-items:center;gap:8px"><label class="hint" for="fs-t" style="margin:0">Во сколько</label><input id="fs-t" class="field sm" type="time" style="max-width:130px" value="${pad2(nowT())}"></div>
     <div class="hint" style="margin-top:6px">У продукта укажите граммы и нажмите «+». Если граммы не указать, добавится 100 г.</div>
     <div id="fs-list" style="margin-top:6px">${libList("")}</div>
     <div class="pills" style="margin-top:8px"><button class="btn sec" data-fpanel="">Закрыть</button></div></div>`;
@@ -1435,7 +1454,7 @@ let SRCH = [];
 function libList(q){
   SRCH = searchItems(q);
   if (!q.trim() && !SRCH.length) return '<div class="empty">Начните вводить название: в базе больше 150 продуктов. Ваши собственные продукты тоже будут здесь.</div>';
-  if (!SRCH.length) return '<div class="empty">Ничего не нашлось. Добавьте продукт через «+ Добавить продукт».</div>';
+  if (!SRCH.length) return '<div class="empty">Ничего не нашлось. Добавьте продукт через «+ Добавить продукт в меню».</div>';
   return `${!q.trim() ? '<div class="hint" style="margin:0 0 4px">Ваш архив:</div>' : ""}<div class="srch">${SRCH.map((x, k) => `<div class="srow">
     <div class="sn"><div>${esc(x.n)}</div><small>${x.k100 != null ? num(x.k100) + " ккал / 100 " + unitOf(x) : int(x.kcal) + " ккал за порцию"}${x.own != null ? " · мой" : ""}</small><b class="sk" id="sk-${k}"></b></div>
     ${x.k100 != null ? `<input class="field sm sg" id="sg-${k}" inputmode="numeric" placeholder="${unitOf(x) === "мл" ? "Укажите мл" : "Укажите граммы"}" aria-label="Сколько ${unitOf(x)}">` : ""}
@@ -1467,7 +1486,8 @@ function addFood(){
   if (!(k >= 0 && k < 1000)) { msg.textContent = "Впишите ккал на 100 г"; return; }
   if (!(g > 0 && g < 5000)) { msg.textContent = "Впишите, сколько граммов съели"; return; }
   if (document.getElementById("af-save").checked) libPut(nm, Math.round(k * 10) / 10);
-  mutDay(S.sel, d => { d.extra = (d.extra || []).concat([{ n: nm, g: Math.round(g), kcal: Math.round(k * g / 100), done: false }]); }); S.fpanel = ""; render();
+  const t = normT(document.getElementById("af-t") && document.getElementById("af-t").value) || nowT();
+  mutDay(S.sel, d => { d.extra = (d.extra || []).concat([{ n: nm, g: Math.round(g), kcal: Math.round(k * g / 100), t, done: false }]); }); S.fpanel = ""; render();
   toast("«" + nm + "» добавлен в меню. Отметьте квадратик, когда съедите.");
 }
 function addAct(){
@@ -1599,8 +1619,24 @@ document.addEventListener("click", e => {
       if (x.k100 != null) { const gi = document.getElementById("sg-" + k), gv = parseNum(gi && gi.value), g = gv > 0 && gv < 5000 ? Math.round(gv) : 100;
         item = { n: x.n, g, u: x.u, kcal: Math.round(x.k100 * g / 100), done: false }; }
       else item = { n: x.n, kcal: x.kcal, done: false };
-      mutDay(S.sel, d => { d.extra = (d.extra || []).concat([item]); }); toast("«" + x.n + "»" + (item.g ? ", " + item.g + " " + unitOf(item) : "") + " — в меню"); const q = document.getElementById("fs-q"); const qv = q ? q.value : ""; render(); const q2 = document.getElementById("fs-q"); if (q2) { q2.value = qv; document.getElementById("fs-list").innerHTML = libList(qv); } } return; }
+      const ti = document.getElementById("fs-t"); item.t = normT(ti && ti.value) || nowT();
+      mutDay(S.sel, d => { d.extra = (d.extra || []).concat([item]); }); toast("«" + x.n + "»" + (item.g ? ", " + item.g + " " + unitOf(item) : "") + " — в меню"); const q = document.getElementById("fs-q"); const qv = q ? q.value : "", tv = (document.getElementById("fs-t") || {}).value; render(); const t2 = document.getElementById("fs-t"); if (t2 && tv) t2.value = tv; const q2 = document.getElementById("fs-q"); if (q2) { q2.value = qv; document.getElementById("fs-list").innerHTML = libList(qv); } } return; }
   if (ds.libdel != null) { const l = lib().slice(); l.splice(+ds.libdel, 1); saveLib(l); const q = document.getElementById("fs-q"); const el = document.getElementById("fs-list"); if (el) el.innerHTML = libList(q ? q.value : ""); return; }
+  if (ds.tedit) { const [kind, k] = ds.tedit.split(":");
+    if (kind === "x") { const x = extraFood(S.sel)[+k]; if (!x) return;
+      showModal("Время: " + x.n, `<input type="time" id="te-v" class="field sm" value="${pad2(x.t || nowT())}">
+        <div class="pills" style="margin-top:12px;gap:8px"><button class="btn" data-tsave="x:${k}">Сохранить</button></div>`, true); return; }
+    const x = visibleMeals(S.sel).find(y => y.k === k); if (!x) return;
+    showModal("Время: " + x.title, `<input type="time" id="te-v" class="field sm" value="${pad2(x.time) || "20:00"}">
+      <div class="pills" style="margin-top:12px;gap:8px"><button class="btn" data-tsave="day:${k}">Только в этот день</button><button class="btn sec" data-tsave="all:${k}">Во всех днях</button>
+      ${x.custom ? `<button class="btn sec" data-tsave="reset:${k}">Вернуть как было (${esc(x.orig)})</button>` : ""}</div>`, true); return; }
+  if (ds.tsave) { const [scope, k] = ds.tsave.split(":"), t = normT((document.getElementById("te-v") || {}).value);
+    if (scope === "reset") { mutDay(S.sel, d => { if (d.times) delete d.times[k]; }); const pt = Object.assign({}, S.profile.mealTimes || {}); delete pt[k]; S.profile = Object.assign({}, S.profile, { mealTimes: pt }); queueSave("profile"); closeModal(); render(); return; }
+    if (!t) return;
+    if (scope === "x") mutDay(S.sel, d => { const x = (d.extra || [])[+k]; if (x) x.t = t; });
+    else if (scope === "day") mutDay(S.sel, d => { d.times = Object.assign({}, d.times || {}, { [k]: t }); });
+    else { mutDay(S.sel, d => { if (d.times) delete d.times[k]; }); S.profile = Object.assign({}, S.profile, { mealTimes: Object.assign({}, S.profile.mealTimes || {}, { [k]: t }) }); queueSave("profile"); }
+    closeModal(); render(); toast("Время: " + t); return; }
   if (ds.hidemeal != null) { const k = ds.hidemeal;
     showModal("Убрать пункт?", `<div class="tip">Можно убрать только на этот день или из всех дней. Вернуть можно кнопкой «Вернуть скрытые пункты» вверху вкладки «Питание».</div>
       <div class="pills" style="margin-top:12px;gap:8px"><button class="btn" data-hm="day:${k}">Только в этот день</button><button class="btn sec" data-hm="all:${k}">Из всех дней</button></div>`, true); return; }
