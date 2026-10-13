@@ -66,7 +66,7 @@ main,.card{min-width:0;max-width:100%}
 .chip em{width:5px;height:5px;border-radius:50%;background:transparent;margin-top:2px}
 .chip.has em{background:var(--muted)} .chip.done em{background:var(--ok)}
 .chip.today{border-color:var(--accent);background:var(--card)}
-.chip .tl{font-size:9px;font-weight:700;letter-spacing:.02em;color:var(--accent);margin-top:1px;line-height:1.2}
+.chip .tl{font-size:9px;font-weight:700;letter-spacing:0;white-space:nowrap;overflow-wrap:normal;color:var(--accent);margin-top:1px;line-height:1.2}
 .chip.sel .tl{color:inherit}
 .chip.sel{background:linear-gradient(160deg,var(--accent2),var(--accent));color:var(--accent-text);border-color:transparent;box-shadow:0 6px 16px color-mix(in srgb,var(--accent) 35%,transparent)} .chip.sel small{color:inherit;opacity:.8} .chip.sel em{background:currentColor}
 main{padding:14px 0 110px}
@@ -164,6 +164,8 @@ svg.chart{width:100%;height:auto;display:block}
 .tabs button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 9px;font-size:11px;color:var(--muted);font-weight:600}
 .tabs svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .tabs button.on{color:var(--accent)}
+.tabs button{white-space:nowrap;overflow-wrap:normal;min-width:0} .brand b{white-space:nowrap}
+@media (max-width:370px){.chip .tl{font-size:8px;letter-spacing:-.02em} .tabs button{font-size:10px;letter-spacing:-.02em} .brand b{font-size:16px} .sync>span{display:none}}
 .empty{padding:22px 10px;text-align:center;color:var(--muted);font-size:14px}
 .sec-title{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:18px 2px 8px}
 .wkrow{display:grid;grid-template-columns:34px 1fr auto;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:14px;width:100%;text-align:left}
