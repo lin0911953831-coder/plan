@@ -787,7 +787,7 @@ function boot() {
   const saved = LS.get("pp_data", null);
   if (saved) { S.days = saved.days || {}; S.profile = saved.profile || {}; }
   S.loaded = true; S.mode = "phone"; S.sel = clampI(todayIdx());
-  persist(); render(); renderBanner();
+  persist(); render(); renderBanner(); requestAnimationFrame(() => scrollFood());
   if ("serviceWorker" in navigator) setupUpdates();
 }
 /* Обновления: при каждом возврате в приложение тихо проверяем новую версию и перезагружаемся, когда это никому не мешает. */
@@ -1496,6 +1496,14 @@ function vSettings(){
   <section class="card"><div class="tip" style="margin-top:0">Только для взрослых 18+. Рекомендации носят ознакомительный характер и не заменяют консультацию врача. <button type="button" class="hlink" style="margin:0;padding:0" data-terms>Условия использования</button></div></section>`;
 }
 
+/* Во вкладке «Питание» сразу показываем последнюю отмеченную галочку, чтобы не листать. */
+function scrollFood(){
+  if (S.tab !== "food" || S.setup || !S.profile.start) return;
+  const on = document.querySelectorAll("#main .list .item.on"); if (!on.length) return;
+  const el = on[on.length - 1], top = document.querySelector(".top"), h = top ? top.getBoundingClientRect().height : 0;
+  const y = el.getBoundingClientRect().top + window.scrollY - h - 12;
+  if (y > 40) window.scrollTo(0, y);
+}
 /* ---------- render ---------- */
 function isEditing(){ const a = document.activeElement; return a && a.tagName === "INPUT" && document.getElementById("main").contains(a); }
 function render(){
@@ -1616,8 +1624,8 @@ document.addEventListener("click", e => {
   if (ds.setup === "open") { S.setup = true; render(); window.scrollTo(0, 0); return; }
   if (ds.setup === "cancel") { S.setup = false; render(); return; }
   if (ds.setup === "save") { saveSetup(); return; }
-  if (ds.tab) { S.setup = false; S.tab = ds.tab; try { localStorage.setItem("pp_tab", S.tab); } catch (er) {} render(); window.scrollTo(0, 0); return; }
-  if (ds.go) { S.tab = ds.go; try { localStorage.setItem("pp_tab", S.tab); } catch (er) {} render(); window.scrollTo(0, 0); return; }
+  if (ds.tab) { S.setup = false; S.tab = ds.tab; try { localStorage.setItem("pp_tab", S.tab); } catch (er) {} render(); window.scrollTo(0, 0); scrollFood(); return; }
+  if (ds.go) { S.tab = ds.go; try { localStorage.setItem("pp_tab", S.tab); } catch (er) {} render(); window.scrollTo(0, 0); scrollFood(); return; }
   if (ds.day != null) { S.sel = clampI(+ds.day); render(); return; }
   if (ds.wk) { S.sel = clampI(S.sel + 7 * +ds.wk); render(); return; }
   if (ds.today != null) { S.sel = clampI(todayIdx()); render(); return; }
