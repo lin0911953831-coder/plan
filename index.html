@@ -176,6 +176,10 @@ h2.stp{font-size:16px;margin-bottom:10px}
 .addrow{margin-top:10px} select.field{appearance:auto;font-size:16px}
 .hlink{font-size:12px;font-weight:600;color:var(--muted);text-decoration:underline;padding:5px 2px;margin-top:8px}
 .terms p{margin:0 0 10px;font-size:14px;line-height:1.5}
+.hsteps{margin:10px 0 4px;display:flex;flex-direction:column;gap:10px}
+.hs{display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start}
+.hn{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-size:14px}
+.ht{font-weight:600;font-size:15px} .hd{font-size:14px;color:var(--muted);margin-top:2px}
 .hbtn{margin-top:8px;font-size:12px;font-weight:600;padding:5px 9px;border-radius:999px;background:var(--fast-soft);color:var(--fast)}
 .toast{position:fixed;left:16px;right:16px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:9;background:var(--text);color:var(--bg);padding:12px 14px;border-radius:14px;font-size:14px;opacity:0;transform:translateY(10px);transition:.2s;pointer-events:none;max-width:560px;margin:0 auto}
 .toast.on{opacity:1;transform:none}
@@ -1194,35 +1198,46 @@ document.addEventListener("change", e => {
 
 
 /* ---------- steps from Apple Health via Shortcuts ---------- */
-const SHORTCUT = "Шаги для Здорового тела";
+const SHORTCUT = "Шаги";
 function healthHelp(){
-  return `<div class="tip">Сайты на iPhone не могут читать «Здоровье» напрямую, поэтому шаги передаёт быстрая команда в приложении «Команды». Настраивается один раз, примерно 3 минуты:</div>
-  <ol class="small" style="margin:8px 0 0;padding-left:20px;line-height:1.55">
-    <li>Откройте приложение «Команды» → «+». Назовите команду <b>${SHORTCUT}</b> (именно так).</li>
-    <li>Добавьте действие <b>«Найти образцы здоровья»</b>: тип «Шаги», фильтр «Дата начала» — «Сегодня».</li>
-    <li>Добавьте <b>«Вычислить статистику»</b> → «Сумма» для найденных образцов.</li>
-    <li>Добавьте <b>«Текст»</b> и впишите: <b>ШАГИ</b>, пробел, переменная «Статистика», пробел, переменная «Текущая дата» с форматом «Свой»: <b>yyyy-MM-dd</b>.</li>
-    <li>Добавьте <b>«Скопировать в буфер обмена»</b>. Сохраните команду и один раз запустите её, разрешив доступ к «Здоровью».</li>
-  </ol>
-  <div class="tip">Как пользоваться: нажмите «Из «Здоровья»» — откроется команда. Вернитесь в приложение и нажмите кнопку ещё раз: шаги подставятся сами. Если носите Apple Watch, шаги с часов и телефона могут сложиться дважды — тогда в шаге 2 добавьте фильтр «Источник» — ваш iPhone.</div>`;
+  const step = (n, t, d) => `<div class="hs"><b class="hn">${n}</b><div><div class="ht">${t}</div>${d ? `<div class="hd">${d}</div>` : ""}</div></div>`;
+  return `<div class="tip" style="margin-top:0">Сайты не могут сами читать «Здоровье», поэтому один раз сделаем маленькую команду в приложении <b>«Команды»</b> (оно есть на каждом iPhone). Это 2 минуты.</div>
+  <div class="hsteps">
+    ${step(1, "Откройте «Команды» и нажмите «+»", "Справа вверху.")}
+    ${step(2, "Назовите команду: Шаги", "Нажмите на название вверху экрана и впишите одно слово <b>Шаги</b>.")}
+    ${step(3, "Добавьте «Найти образцы здоровья»", "Начните вводить в поиске внизу «образцы». В действии выберите тип <b>Шаги</b>, нажмите «Добавить фильтр» → <b>Дата начала</b> → <b>сегодня</b>.")}
+    ${step(4, "Добавьте «Вычислить статистику»", "Найдите в поиске «статистику» и вместо «Среднее» выберите <b>Сумма</b>.")}
+    ${step(5, "Добавьте «Скопировать в буфер обмена»", "Найдите в поиске «буфер».")}
+    ${step(6, "Нажмите «Готово» и запустите команду один раз", "iPhone спросит доступ к «Здоровью» — разрешите.")}
+  </div>
+  <div class="tip"><b>Каждый день:</b> нажмите «♥ Из «Здоровья»» → откроются «Команды» → вернитесь в приложение → нажмите «♥ Из «Здоровья»» ещё раз. Шаги подставятся сами.</div>
+  <div class="tip">Не хотите настраивать — просто посмотрите шаги в приложении «Здоровье» и впишите число в поле «Шаги».</div>`;
 }
-let healthAsked = 0;
+const HASK = "pp_hask";
+const healthAskedAt = () => { try { return +localStorage.getItem(HASK) || 0; } catch (e) { return 0; } };
 async function healthSteps(){
   let txt = "";
   try { if (navigator.clipboard && navigator.clipboard.readText) txt = await navigator.clipboard.readText(); } catch (e) {}
-  const m = /(?:GROM|ШАГИ)\s+([\d\s.,]+?)\s*(\d{4}-\d{2}-\d{2})?\s*$/i.exec((txt || "").trim());
-  if (m) {
-    const v = Math.round(parseFloat(m[1].replace(/\s/g, "").replace(",", "."))), k = m[2], i = k ? idxOfKey(k) : clampI(todayIdx());
-    if (v >= 0 && v < 100000 && i >= 0 && i < DAYS) {
-      mutDay(i, d => { d.steps = v; }); S.sel = i; render(); toast("Шаги за " + fmtDate(i) + ": " + int(v));
-      try { await navigator.clipboard.writeText(""); } catch (e) {}
-      return;
-    }
+  txt = (txt || "").trim();
+  const recent = Date.now() - healthAskedAt() < 15 * 60000;
+  let v = null, i = clampI(todayIdx());
+  const m = /(?:GROM|ШАГИ)\s+([\d\s.,]+?)\s*(\d{4}-\d{2}-\d{2})?\s*$/i.exec(txt);
+  if (m) { v = parseFloat(m[1].replace(/\s/g, "").replace(",", ".")); if (m[2]) i = idxOfKey(m[2]); }
+  else if (recent && /^[\d\s\u00a0.,]+$/.test(txt)) v = parseFloat(txt.replace(/[\s\u00a0]/g, "").replace(",", "."));
+  if (v != null && isFinite(v) && v >= 0 && v < 100000 && i >= 0 && i < DAYS) {
+    v = Math.round(v); mutDay(i, d => { d.steps = v; }); S.sel = i; render(); toast("Шаги за " + fmtDate(i) + ": " + int(v));
+    try { localStorage.removeItem(HASK); } catch (e) {}
+    try { await navigator.clipboard.writeText(""); } catch (e) {}
+    return;
   }
-  if (Date.now() - healthAsked < 120000) { toast("Не нашёл шаги в буфере. Проверьте команду «" + SHORTCUT + "»: инструкция во вкладке «Активность»."); }
-  healthAsked = Date.now();
-  location.href = "shortcuts://run-shortcut?name=" + encodeURIComponent(SHORTCUT);
+  if (recent) { showModal("Шаги не пришли", '<div class="tip" style="margin-top:0">Похоже, команда «Шаги» ещё не настроена или называется иначе.</div>' + healthHelp()); try { localStorage.removeItem(HASK); } catch (e) {} return; }
+  try { localStorage.setItem(HASK, String(Date.now())); } catch (e) {}
+  toast("Открываю «Команды». Потом вернитесь и нажмите «♥ Из «Здоровья»» ещё раз.");
+  setTimeout(() => { location.href = "shortcuts://run-shortcut?name=" + encodeURIComponent(SHORTCUT); }, 600);
 }
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && Date.now() - healthAskedAt() < 15 * 60000) toast("Нажмите «♥ Из «Здоровья»», чтобы вставить шаги.");
+});
 const idxOfKey = k => { const d = parseKey(k); return d ? Math.round((d - startDate()) / 864e5) : -1; };
 function showModal(title, html){ closeModal(); const m = document.createElement("div"); m.className = "modal"; m.id = "modal";
   m.innerHTML = `<div><div class="rowh"><h2 style="font-size:18px">${esc(title)}</h2><button class="xbtn" data-modalclose aria-label="Закрыть">×</button></div><div style="margin-top:8px">${html}</div>
