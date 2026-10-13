@@ -34,12 +34,14 @@
   --water:#5cb8f5; --water-soft:#14303f; --shadow:none; color-scheme:dark;
 }
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--text)}
+html,body{margin:0;background:var(--bg);color:var(--text);overflow-x:hidden;overflow-x:clip;max-width:100%}
+html{touch-action:pan-y;-webkit-text-size-adjust:100%}
 body{font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-text-size-adjust:100%;overflow-x:hidden}
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 input{font:inherit;color:inherit}
 h1,h2,h3{margin:0;line-height:1.2}
-.wrap{max-width:680px;margin:0 auto;padding:0 16px}
+.wrap{max-width:680px;margin:0 auto;padding:0 16px;overflow-wrap:anywhere}
+main,.card{min-width:0;max-width:100%}
 .top{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);padding-top:calc(10px + env(safe-area-inset-top));border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
 .brand b{font-size:17px;letter-spacing:-.01em}
@@ -82,7 +84,8 @@ main{padding:14px 0 110px}
 .link{display:block;width:100%;text-align:left}
 .rowh{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .rowh h2{font-size:17px}
-.pill{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--card2);color:var(--muted);white-space:nowrap}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--card2);color:var(--muted);white-space:nowrap;max-width:100%}
+.pills .pill{white-space:normal;line-height:1.35}
 .pill.g{background:var(--ok-soft);color:var(--ok)} .pill.w{background:var(--water-soft);color:var(--water)}
 .pill.o{background:var(--warn-soft);color:var(--warn)} .pill.r{background:var(--fast-soft);color:var(--fast)} .pill.b{background:var(--calm-soft);color:var(--calm)}
 .pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
@@ -137,7 +140,7 @@ svg.chart{width:100%;height:auto;display:block}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 16px;border-radius:14px;background:linear-gradient(160deg,var(--accent2),var(--accent));color:var(--accent-text);font-weight:600}
 .btn.sec{background:var(--card2);color:var(--text)}
 .timer{border-radius:14px;padding:14px;margin-top:10px;background:var(--card2);text-align:center}
-.timer .btn{padding:9px 12px;font-size:14px} .timer .btn.sec{background:var(--card)}
+.timer .btn{padding:9px 12px;font-size:14px;white-space:normal} .timer .btn.sec{background:var(--card)}
 .timer.fast{background:var(--fast-soft)} .timer.calm{background:var(--calm-soft)}
 .timer .ph{font-weight:700;font-size:15px}
 .timer.fast .ph{color:var(--fast)} .timer.calm .ph{color:var(--calm)}
@@ -925,7 +928,7 @@ function vTrain(){
     <div class="eyebrow">${WD[i%7]}, ${fmtDate(i)} · неделя ${w}${w === 6 || w === 12 ? " · разгрузка" : ""}</div>
     <div class="rowh" style="margin-top:4px"><h2 style="font-size:21px">${esc(p.title)}</h2><span class="pill ${td.full ? "g" : ""}">${td.n} из ${td.of}</span></div>
     <div class="pills">${p.time ? `<span class="pill">${esc(p.time)}</span>` : ""}${p.dur ? `<span class="pill">${esc(p.dur)}</span>` : ""}
-      ${p.pulse ? `<span class="pill r">пульс ${p.pulse}</span>` : ""}${p.inten ? `<span class="pill o">интенсивность ${esc(p.inten)}</span>` : ""}</div>
+      ${p.pulse ? `<span class="pill r">пульс ${p.pulse}</span>` : ""}${p.inten ? `<span class="pill o">Интенсивность: ${esc(p.inten)}</span>` : ""}</div>
     ${p.type === "strength" ? `<div class="tip">${esc(program().focus[w-1])}</div>` : ""}
     ${p.type === "interval" ? `<div class="tip">Где: ${esc(p.mode)}.${program().e.noRun ? " Бег и прыжки вам пока не нужны: лишняя нагрузка на суставы." : ""}</div><div id="itimer"></div>` : ""}
     ${p.type === "rest" ? `<div class="tip">Силовых нет. Шаги всё равно по цели.</div>` : ""}
