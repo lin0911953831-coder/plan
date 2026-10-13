@@ -892,7 +892,7 @@ function vFood(){
     <div class="eyebrow">${WD[i%7]}, ${fmtDate(i)}</div>
     <h2 style="font-size:19px;margin-top:4px">${noEx ? "Ваше меню на день" : "Пример плана питания на день"}</h2>
     <div class="tip">${noEx ? "Пример плана убран. Добавляйте свою еду через «+ Добавить продукт» или «Поиск продуктов»." : "Это пример, а не обязательное меню. Ненужные пункты убирайте крестиком, свою еду добавляйте ниже через «+ Добавить продукт» или «Поиск продуктов»."}</div>
-    <div class="pills" style="margin-top:10px;gap:8px">${noEx ? '<button class="btn sec" data-example="on">Вернуть пример плана</button>' : '<button class="btn sec" data-example="off">Убрать весь пример</button>'}${hid && !noEx ? `<button class="btn sec" data-restoremeals>Вернуть скрытые пункты (${hid})</button>` : ""}</div>
+    <div class="pills" style="margin-top:10px;gap:8px"><button class="btn sec" data-remind>🔔 Напоминания</button>${noEx ? '<button class="btn sec" data-example="on">Вернуть пример плана</button>' : '<button class="btn sec" data-example="off">Убрать весь пример</button>'}${hid && !noEx ? `<button class="btn sec" data-restoremeals>Вернуть скрытые пункты (${hid})</button>` : ""}</div>
     <div class="grid4" style="margin-top:12px">
       <div class="stat"><small>Калории</small><b>${int(ft.kcal)}</b><small>из ${int(nutrition().t)}</small></div>
       <div class="stat"><small>Белок, г</small><b>${int(ft.prot)}</b><small>из ${int(ft.protPlan)}</small></div>
@@ -1239,14 +1239,68 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible" && Date.now() - healthAskedAt() < 15 * 60000) toast("Нажмите «♥ Из «Здоровья»», чтобы вставить шаги.");
 });
 const idxOfKey = k => { const d = parseKey(k); return d ? Math.round((d - startDate()) / 864e5) : -1; };
-function showModal(title, html){ closeModal(); const m = document.createElement("div"); m.className = "modal"; m.id = "modal";
+function showModal(title, html, noOk){ closeModal(); const m = document.createElement("div"); m.className = "modal"; m.id = "modal";
   m.innerHTML = `<div><div class="rowh"><h2 style="font-size:18px">${esc(title)}</h2><button class="xbtn" data-modalclose aria-label="Закрыть">×</button></div><div style="margin-top:8px">${html}</div>
-    <div style="margin-top:14px"><button class="btn" data-modalclose>Понятно</button></div></div>`;
+    ${noOk ? "" : '<div style="margin-top:14px"><button class="btn" data-modalclose>Понятно</button></div>'}</div>`;
   m.addEventListener("click", e => { if (e.target === m) closeModal(); }); document.body.appendChild(m); }
 function closeModal(){ const m = document.getElementById("modal"); if (m) m.remove(); }
 let toastT = null;
 function toast(t){ let el = document.getElementById("toast"); if (!el) { el = document.createElement("div"); el.id = "toast"; el.className = "toast"; document.body.appendChild(el); }
   el.textContent = t; el.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove("on"), 3500); }
+
+/* ---------- reminders via Calendar (.ics) ---------- */
+function icsEsc(t){ return String(t).replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n"); }
+function icsFold(line){ const out = []; let cur = "", bytes = 0;
+  for (const ch of line) { const b = new TextEncoder().encode(ch).length; if (bytes + b > 73) { out.push(cur); cur = " "; bytes = 1; } cur += ch; bytes += b; }
+  out.push(cur); return out.join("\r\n"); }
+const icsDate = d => d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate());
+function buildIcs(opt){
+  const t = Math.max(0, Math.min(DAYS - 1, todayIdx())), first = dateAt(t), last = dateAt(DAYS - 1), until = icsDate(last) + "T235959";
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Zdorovoe telo//RU", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:Здоровое тело"];
+  let n = 0;
+  const ev = (hh, mm, title, desc, rrule) => { n++;
+    lines.push("BEGIN:VEVENT", "UID:zt-" + n + "-" + stamp + "@zdorovoe-telo", "DTSTAMP:" + stamp,
+      "DTSTART:" + icsDate(first) + "T" + pad(hh) + pad(mm) + "00", "DURATION:PT10M", rrule,
+      "SUMMARY:" + icsEsc(title), "DESCRIPTION:" + icsEsc(desc), "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(title), "TRIGGER:PT0M", "END:VALARM", "END:VEVENT"); };
+  visibleMeals(t).forEach(x => {
+    const m = /^(\d{1,2}):(\d{2})/.exec(x.time); if (!m) return;
+    if (x.water && !opt.water) return; if (!x.water && !opt.food) return;
+    if (x.k === "m11") return;
+    const title = x.water ? "💧 " + x.title + " " + x.ml + " мл" : "🍽 " + x.title;
+    const desc = x.water ? (x.sub || "") : x.dish ? x.dish.name : (x.lines || []).map(r => r[0] + " — " + r[1]).join("; ");
+    ev(+m[1], +m[2], title, desc + ". Отметьте в приложении «Здоровое тело».", "RRULE:FREQ=DAILY;UNTIL=" + until);
+  });
+  if (opt.train) {
+    const BY = ["MO","TU","WE","TH","FR","SA","SU"], days = [];
+    for (let j = 0; j < 7; j++) { const pl = plan(j); if (pl.type === "strength" || pl.type === "interval") days.push(BY[j] + (/^20/.test(pl.time) ? "" : "@day")); }
+    const eve = days.filter(d => !d.endsWith("@day")), noon = days.filter(d => d.endsWith("@day")).map(d => d.replace("@day", ""));
+    if (eve.length) ev(20, 0, "🏋 Тренировка", "Задание на сегодня — во вкладке «Тренировки». Вода 450 мл небольшими глотками.", "RRULE:FREQ=WEEKLY;BYDAY=" + eve.join(",") + ";UNTIL=" + until);
+    if (noon.length) ev(12, 0, "🏋 Тренировка", "Сегодня тренировка днём. Задание — во вкладке «Тренировки».", "RRULE:FREQ=WEEKLY;BYDAY=" + noon.join(",") + ";UNTIL=" + until);
+  }
+  lines.push("END:VCALENDAR");
+  return { text: lines.map(icsFold).join("\r\n") + "\r\n", count: n };
+}
+function remindModal(){
+  showModal("Напоминания в Календарь", `<div class="tip" style="margin-top:0">Приложение создаст файл с вашим расписанием. iPhone предложит добавить его в Календарь — и напоминания будут приходить каждый день до конца программы, даже когда приложение закрыто.</div>
+    <label class="chk"><input type="checkbox" id="rm-food" checked><span>Приёмы пищи</span></label>
+    <label class="chk"><input type="checkbox" id="rm-water" checked><span>Вода</span></label>
+    <label class="chk"><input type="checkbox" id="rm-train" checked><span>Тренировки</span></label>
+    <div class="tip">Пункты, убранные крестиком, в напоминания не попадут. В окне Календаря нажмите «Добавить все» и выберите отдельный календарь, например «Здоровое тело», — тогда при желании его можно удалить целиком.</div>
+    <div class="pills" style="margin-top:12px;gap:8px"><button class="btn" data-ics="open">Добавить в Календарь</button><button class="btn sec" data-ics="share">Поделиться файлом</button></div>`, true);
+}
+async function doIcs(mode){
+  const opt = { food: document.getElementById("rm-food").checked, water: document.getElementById("rm-water").checked, train: document.getElementById("rm-train").checked };
+  const r = buildIcs(opt); if (!r.count) { toast("Отметьте хотя бы один пункт"); return; }
+  const blob = new Blob([r.text], { type: "text/calendar;charset=utf-8" }), name = "zdorovoe-telo-napominaniya.ics";
+  if (mode === "share") {
+    try { const f = new File([blob], name, { type: "text/calendar" }); if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: "Напоминания" }); return; } } catch (e) { if (e && e.name === "AbortError") return; }
+  }
+  const url = URL.createObjectURL(blob), w = window.open(url, "_blank");
+  if (!w) { const a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  toast("Напоминаний: " + r.count + ". В Календаре нажмите «Добавить все».");
+}
 
 /* ---------- calorie calculators ---------- */
 const FOODS = [
@@ -1462,7 +1516,7 @@ document.addEventListener("click", e => {
   if (ds.libdel != null) { const l = lib().slice(); l.splice(+ds.libdel, 1); saveLib(l); const q = document.getElementById("fs-q"); const el = document.getElementById("fs-list"); if (el) el.innerHTML = libList(q ? q.value : ""); return; }
   if (ds.hidemeal != null) { const k = ds.hidemeal;
     showModal("Убрать пункт?", `<div class="tip">Можно убрать только на этот день или из всех дней. Вернуть можно кнопкой «Вернуть скрытые пункты» вверху вкладки «Питание».</div>
-      <div class="pills" style="margin-top:12px;gap:8px"><button class="btn" data-hm="day:${k}">Только в этот день</button><button class="btn sec" data-hm="all:${k}">Из всех дней</button></div>`); return; }
+      <div class="pills" style="margin-top:12px;gap:8px"><button class="btn" data-hm="day:${k}">Только в этот день</button><button class="btn sec" data-hm="all:${k}">Из всех дней</button></div>`, true); return; }
   if (ds.hm) { const [scope, k] = ds.hm.split(":"); closeModal();
     if (scope === "day") mutDay(S.sel, d => { d.hidden = Object.assign({}, d.hidden || {}, { [k]: true }); });
     else { S.profile = Object.assign({}, S.profile, { hiddenMeals: Object.assign({}, S.profile.hiddenMeals || {}, { [k]: true }) }); queueSave("profile"); }
@@ -1472,6 +1526,8 @@ document.addEventListener("click", e => {
   if (ds.terms != null) { showModal("Условия использования", TERMS_HTML); return; }
   if (ds.acceptterms != null) { const ok = document.getElementById("t-ok"); if (!ok || !ok.checked) { document.getElementById("t-err").textContent = "Поставьте галочку, чтобы продолжить."; return; }
     S.profile = Object.assign({}, S.profile, { terms: ymd(new Date()) }); queueSave("profile"); render(); window.scrollTo(0, 0); return; }
+  if (ds.remind != null) { remindModal(); return; }
+  if (ds.ics) { doIcs(ds.ics); return; }
   if (ds.hhelp != null) { showModal("Шаги из «Здоровья»", healthHelp()); return; }
   if (ds.modalclose != null) { closeModal(); return; }
   if (ds.delfood != null) { const k = +ds.delfood; mutDay(S.sel, d => { d.extra = (d.extra || []).filter((_, j) => j !== k); }); render(); return; }
