@@ -56,13 +56,15 @@ main,.card{min-width:0;max-width:100%}
 .nav{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:var(--card);border:1px solid var(--line)}
 .nav:disabled{opacity:.35;cursor:default}
 .nav svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
-.todaybtn{font-size:12px;padding:4px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-weight:600}
+.todaybtn{font-size:12px;padding:5px 10px;white-space:nowrap;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-weight:600}
 .strip{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;padding-bottom:10px}
 .chip{display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 0 5px;border-radius:12px;border:1px solid transparent;min-width:0}
 .chip small{font-size:11px;color:var(--muted)} .chip span{font-size:16px;font-weight:600}
 .chip em{width:5px;height:5px;border-radius:50%;background:transparent;margin-top:2px}
 .chip.has em{background:var(--muted)} .chip.done em{background:var(--ok)}
-.chip.today{border-color:var(--line);background:var(--card)}
+.chip.today{border-color:var(--accent);background:var(--card)}
+.chip .tl{font-size:9px;font-weight:700;letter-spacing:.02em;color:var(--accent);margin-top:1px;line-height:1.2}
+.chip.sel .tl{color:inherit}
 .chip.sel{background:linear-gradient(160deg,var(--accent2),var(--accent));color:var(--accent-text);border-color:transparent;box-shadow:0 6px 16px color-mix(in srgb,var(--accent) 35%,transparent)} .chip.sel small{color:inherit;opacity:.8} .chip.sel em{background:currentColor}
 main{padding:14px 0 110px}
 .banner{margin:12px 0 0;padding:10px 12px;border-radius:12px;background:var(--warn-soft);color:var(--text);font-size:13px}
@@ -783,13 +785,13 @@ function boot() {
 function renderStrip(){
   const w = weekOf(S.sel), first = (w-1) * 7, t = todayIdx();
   let h = `<div class="weekbar"><button class="nav" data-wk="-1" ${w === 1 ? "disabled" : ""} aria-label="Предыдущая неделя"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
-    <div class="wk"><b>Неделя ${w}</b> из 12 · ${shortRange(first)}</div>
-    ${S.sel !== clampI(t) ? '<button class="todaybtn" data-today>Сегодня</button>' : ""}
+    <div class="wk"><b>Неделя ${w}</b>${S.sel !== clampI(t) && t >= 0 && t < DAYS ? "" : " из 12"} · ${shortRange(first)}</div>
+    ${S.sel !== clampI(t) && t >= 0 && t < DAYS ? '<button class="todaybtn" data-today>↩ На сегодня</button>' : ""}
     <button class="nav" data-wk="1" ${w === 12 ? "disabled" : ""} aria-label="Следующая неделя"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button></div><div class="strip">`;
   for (let j = 0; j < 7; j++) {
     const i = first + j, cls = ["chip"]; if (i === S.sel) cls.push("sel"); if (i === t) cls.push("today");
     if (trainDone(i).full && plan(i).type !== "rest") cls.push("done"); else if (hasData(i)) cls.push("has");
-    h += `<button class="${cls.join(" ")}" data-day="${i}"><small>${WDS[j]}</small><span>${dateAt(i).getDate()}</span><em></em></button>`;
+    h += `<button class="${cls.join(" ")}" data-day="${i}"><small>${WDS[j]}</small><span>${dateAt(i).getDate()}</span>${i === t ? '<b class="tl">сегодня</b>' : "<em></em>"}</button>`;
   }
   document.getElementById("strip").innerHTML = h + "</div>";
 }
@@ -819,7 +821,8 @@ function vToday(){
   return `
   <section class="card hero">
     ${todayIdx() < 0 ? `<div class="pill o" style="margin-bottom:8px">Программа начнётся ${fmtDate(0)}</div>` : todayIdx() >= DAYS ? '<div class="pill g" style="margin-bottom:8px">Программа завершена</div>' : ""}
-    <div class="eyebrow">Неделя ${w} · день ${i+1} из ${DAYS}${w === 6 || w === 12 ? " · разгрузка" : ""}</div>
+    <div class="eyebrow">${i === todayIdx() ? '<span style="color:var(--accent)">Сегодня</span> · ' : ""}Неделя ${w} · день ${i+1} из ${DAYS}${w === 6 || w === 12 ? " · разгрузка" : ""}</div>
+    ${i !== todayIdx() && todayIdx() >= 0 && todayIdx() < DAYS ? `<div class="pill o" style="margin:6px 0 2px">Вы смотрите ${i < todayIdx() ? "прошедший" : "будущий"} день</div>` : ""}
     <h1>${WD[i%7]}, ${fmtDate(i)}</h1>
     <div class="muted small">${esc(program().focus[w-1])}</div>
     <div class="pills"><span class="pill">${esc(GOALS[program().e.goal])}</span><span class="pill">${program().e.lu === program().e.ll ? "Ступень " + program().e.lu : "Верх " + program().e.lu + " · ноги " + program().e.ll}</span><span class="pill">${esc(eqText(program().e.eq))}</span></div>
