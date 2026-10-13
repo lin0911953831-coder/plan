@@ -788,7 +788,20 @@ function boot() {
   if (saved) { S.days = saved.days || {}; S.profile = saved.profile || {}; }
   S.loaded = true; S.mode = "phone"; S.sel = clampI(todayIdx());
   persist(); render(); renderBanner();
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  if ("serviceWorker" in navigator) setupUpdates();
+}
+/* Обновления: при каждом возврате в приложение тихо проверяем новую версию и перезагружаемся, когда это никому не мешает. */
+function setupUpdates() {
+  const sw = navigator.serviceWorker, hadController = !!sw.controller;
+  let pending = false, lastCheck = 0;
+  sw.register("sw.js").catch(() => {});
+  const busy = () => isEditing() || document.getElementById("modal") || !document.getElementById("timerbar").hidden || (!S.profile.start && document.getElementById("s-age") && document.getElementById("s-age").value);
+  const apply = () => { if (pending && !busy()) { pending = false; location.reload(); } };
+  sw.addEventListener("controllerchange", () => { if (!hadController) return; pending = true; if (document.visibilityState === "visible") setTimeout(apply, 300); });
+  const check = () => { if (Date.now() - lastCheck < 60000) return; lastCheck = Date.now(); sw.getRegistration().then(r => r && r.update()).catch(() => {}); };
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { apply(); check(); } });
+  window.addEventListener("focus", () => { apply(); check(); });
+  setInterval(() => { if (document.visibilityState === "visible") { apply(); check(); } }, 30 * 60000);
 }
 
 
