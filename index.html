@@ -844,7 +844,7 @@ function vToday(){
       <input id="f-s" class="field" inputmode="numeric" autocomplete="off" placeholder="—" data-f="steps" data-i="${i}" value="${d.steps != null ? d.steps : ""}">
       <div class="bar ${d.steps != null && d.steps < g ? "warn" : ""}"><i style="width:${stepsPct}%"></i></div>
       <div class="hint">Цель ${int(g)}${d.steps != null ? (d.steps >= g ? " · выполнено" : " · осталось " + int(g - d.steps)) : ""}</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button class="hbtn" data-health>♥ Из «Здоровья»</button><button class="hlink" data-hhelp>Как настроить?</button></div></div>
+      ${IS_IOS ? '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button class="hbtn" data-health>♥ Из «Здоровья»</button><button class="hlink" data-hhelp>Как настроить?</button></div>' : ""}</div>
   </div>
   <button class="card link" data-go="train">
     <div class="rowh"><div><div class="eyebrow">Тренировка</div><h2 style="margin-top:3px">${esc(p.title)}</h2></div>
@@ -976,7 +976,7 @@ function vSteps(){
       <div class="stat"><small>Всего</small><b>${cnt ? int(sum) : "—"}</b></div>
       <div class="stat"><small>Внесено дней</small><b>${cnt}</b></div>
     </div></section>
-  <section class="card">${rows}<div class="pills" style="margin-top:10px;gap:8px"><button class="btn sec" data-health>♥ Шаги за сегодня из «Здоровья»</button><button class="btn sec" data-hhelp>Как настроить</button></div>
+  <section class="card">${rows}${IS_IOS ? '<div class="pills" style="margin-top:10px;gap:8px"><button class="btn sec" data-health>♥ Шаги за сегодня из «Здоровья»</button><button class="btn sec" data-hhelp>Как настроить</button></div>' : ""}
     <details style="margin-top:10px"><summary>Как подключить «Здоровье» на iPhone</summary>${healthHelp()}</details><div class="hint">Шаги смотрите в приложении телефона или часов и вносите вечером.</div></section>
   <div class="sec-title">${WD[S.sel%7]}, ${fmtDate(S.sel)}</div>
   ${activityCard(S.sel)}
@@ -1200,6 +1200,7 @@ document.addEventListener("change", e => {
 
 /* ---------- steps from Apple Health via Shortcuts ---------- */
 const SHORTCUT = "Шаги";
+const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 function healthHelp(){
   const step = (n, t, d) => `<div class="hs"><b class="hn">${n}</b><div><div class="ht">${t}</div>${d ? `<div class="hd">${d}</div>` : ""}</div></div>`;
   return `<div class="tip" style="margin-top:0">Сайты не могут сами читать «Здоровье», поэтому один раз сделаем маленькую команду в приложении <b>«Команды»</b> (оно есть на каждом iPhone). Это 2 минуты.</div>
@@ -1437,9 +1438,9 @@ function vSettings(){
   <section class="card"><h2 style="font-size:16px">Напоминания</h2>
     <div class="tip">Приёмы пищи, вода и тренировки в Календаре iPhone — придут уведомлениями, даже когда приложение закрыто.</div>
     <div style="margin-top:10px"><button class="btn sec" data-remind>🔔 Напоминания в Календарь</button></div></section>
-  <section class="card"><h2 style="font-size:16px">Шаги из «Здоровья»</h2>
+  ${IS_IOS ? `<section class="card"><h2 style="font-size:16px">Шаги из «Здоровья»</h2>
     <div class="tip">Один раз настройте команду «Шаги» — потом шаги подставляются кнопкой «♥ Из «Здоровья»».</div>
-    <div style="margin-top:10px"><button class="btn sec" data-hhelp>Как настроить</button></div></section>
+    <div style="margin-top:10px"><button class="btn sec" data-hhelp>Как настроить</button></div></section>` : ""}
   ${settingsCard(sw)}
   <section class="card"><div class="tip" style="margin-top:0">Только для взрослых 18+. Рекомендации носят ознакомительный характер и не заменяют консультацию врача. <button type="button" class="hlink" style="margin:0;padding:0" data-terms>Условия использования</button></div></section>`;
 }
