@@ -48,6 +48,9 @@ main,.card{min-width:0;max-width:100%}
 .top{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);padding-top:calc(10px + env(safe-area-inset-top));border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
 .brand b{font-size:17px;letter-spacing:-.01em}
+.gear{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:var(--card2);color:var(--muted)}
+.gear svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.gear.on{background:var(--accent-soft);color:var(--accent)}
 .sync{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;white-space:nowrap}
 .sync i{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
 .sync.ok i{background:var(--ok)} .sync.busy i{background:var(--warn)} .sync.off i{background:var(--fast)}
@@ -200,7 +203,7 @@ h2.stp{font-size:16px;margin-bottom:10px}
 </style>
 
 <div class="top"><div class="wrap">
-  <div class="brand"><b>Здоровое тело</b><span id="sync" class="sync"><i></i><span>Подключаюсь…</span></span></div>
+  <div class="brand"><b>Здоровое тело</b><span style="display:flex;align-items:center;gap:10px"><span id="sync" class="sync"><i></i><span>Подключаюсь…</span></span><button class="gear" data-tab="settings" aria-label="Настройки"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button></span></div>
   <div id="strip"></div>
 </div></div>
 <div class="wrap"><div id="banner"></div><main id="main"></main></div>
@@ -237,7 +240,7 @@ const CHECK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
 /* ---------- state ---------- */
 const S = { tab: "today", sel: 0, days: {}, profile: {}, setup: false,
   mode: "connecting", loaded: false, col: null, inflight: 0, error: "", needRender: false, downloads: null };
-try { const t = localStorage.getItem("pp_tab"); if (t && ["today","food","train","steps","progress"].includes(t)) S.tab = t; } catch (e) {}
+try { const t = localStorage.getItem("pp_tab"); if (t && ["today","food","train","steps","progress","settings"].includes(t)) S.tab = t; } catch (e) {}
 const day = i => S.days[keyAt(i)] || {};
 
 /* ---------- personal numbers ---------- */
@@ -1029,12 +1032,7 @@ function vProgress(){
   <div class="sec-title">По неделям</div>
   <section class="card"><table class="tbl"><tr><th>Нед.</th><th>Ср. вес</th><th>Изм.</th><th>Шаги</th><th>Тренировки</th></tr>${rows}</table>
     <div class="hint">Тренировка засчитывается, когда отмечены все её пункты. Выполнено ${doneW} из ${planW} на сегодня.</div></section>
-  ${profileCard()}
-  <section class="card"><h2 style="font-size:16px">Оформление</h2>
-    <div class="seg" style="margin-top:10px">${[["auto","Как в iPhone"],["light","Светлое"],["dark","Тёмное"]].map(([k, l]) => `<button class="${getTheme() === k ? "on" : ""}" data-theme="${k}">${l}</button>`).join("")}</div>
-    <div class="hint">«Как в iPhone» — меняется вместе с тёмным режимом телефона.</div></section>
-  <section class="card"><div class="tip" style="margin-top:0">Только для взрослых 18+. Рекомендации носят ознакомительный характер и не заменяют консультацию врача. <button type="button" class="hlink" style="margin:0;padding:0" data-terms>Условия использования</button></div></section>
-  ${settingsCard(sw)}`;
+  <section class="card"><button class="link rowh" data-tab="settings"><span><b>Ваш план, данные и оформление</b><br><span class="hint" style="margin:0">Перенесены в настройки ⚙️</span></span><span class="go" style="margin:0">Открыть →</span></button></section>`;
 }
 
 const TERMS_HTML = `<div class="terms">
@@ -1428,18 +1426,35 @@ function addAct(){
   mutDay(S.sel, d => { d.act = (d.act || []).concat([item]); }); render();
 }
 
+function vSettings(){
+  const sw = S.profile.startWeight || 80, th = getTheme();
+  return `<section class="card hero"><h1>Настройки</h1><div class="muted small">План, оформление, напоминания и данные — в одном месте.</div></section>
+  ${profileCard()}
+  <section class="card"><h2 style="font-size:16px">Оформление</h2>
+    <div class="seg" style="margin-top:10px">${[["light","☀️ Светлое"],["dark","🌙 Тёмное"]].map(([k, l]) => `<button class="${th === k ? "on" : ""}" data-theme="${k}">${l}</button>`).join("")}</div></section>
+  <section class="card"><h2 style="font-size:16px">Напоминания</h2>
+    <div class="tip">Приёмы пищи, вода и тренировки в Календаре iPhone — придут уведомлениями, даже когда приложение закрыто.</div>
+    <div style="margin-top:10px"><button class="btn sec" data-remind>🔔 Напоминания в Календарь</button></div></section>
+  <section class="card"><h2 style="font-size:16px">Шаги из «Здоровья»</h2>
+    <div class="tip">Один раз настройте команду «Шаги» — потом шаги подставляются кнопкой «♥ Из «Здоровья»».</div>
+    <div style="margin-top:10px"><button class="btn sec" data-hhelp>Как настроить</button></div></section>
+  ${settingsCard(sw)}
+  <section class="card"><div class="tip" style="margin-top:0">Только для взрослых 18+. Рекомендации носят ознакомительный характер и не заменяют консультацию врача. <button type="button" class="hlink" style="margin:0;padding:0" data-terms>Условия использования</button></div></section>`;
+}
+
 /* ---------- render ---------- */
 function isEditing(){ const a = document.activeElement; return a && a.tagName === "INPUT" && document.getElementById("main").contains(a); }
 function render(){
   S.needRender = false;
   const setup = !S.profile.start || S.setup;
   document.querySelector(".tabs").hidden = !S.profile.start;
-  if (setup) document.getElementById("strip").innerHTML = ""; else renderStrip();
+  if (setup || S.tab === "settings") document.getElementById("strip").innerHTML = ""; else renderStrip();
   renderTabs(); syncUI();
   const main = document.getElementById("main");
   if (setup) { main.innerHTML = vSetup(); setupLive(); afterRender(); return; }
   if (!S.profile.terms) { document.querySelector(".tabs").hidden = true; document.getElementById("strip").innerHTML = ""; main.innerHTML = vTerms(); return; }
-  const v = { today: vToday, food: vFood, train: vTrain, steps: vSteps, progress: vProgress }[S.tab]();
+  const v = ({ today: vToday, food: vFood, train: vTrain, steps: vSteps, progress: vProgress, settings: vSettings }[S.tab] || vToday)();
+  const gear = document.querySelector(".gear"); if (gear) gear.classList.toggle("on", S.tab === "settings");
   main.innerHTML = v;
   afterRender();
   if (S.tab === "train" && plan(S.sel).type === "interval") drawITimer();
@@ -1580,11 +1595,12 @@ document.addEventListener("change", e => { if (e.target.matches("input[data-f]")
 document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.matches("input[data-f]")) e.target.blur(); });
 
 /* ---------- theme ---------- */
-function getTheme(){ try { return localStorage.getItem("pp_theme") || "auto"; } catch (e) { return "auto"; } }
+function getTheme(){ let t = null; try { t = localStorage.getItem("pp_theme"); } catch (e) {}
+  if (t === "light" || t === "dark") return t; return window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; }
 function applyTheme(t){
   const root = document.documentElement;
-  if (t === "light" || t === "dark") root.setAttribute("data-theme", t); else root.removeAttribute("data-theme");
-  const dark = t === "dark" || (t !== "light" && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
+  root.setAttribute("data-theme", t);
+  const dark = t === "dark";
   document.querySelectorAll('meta[name="theme-color"]').forEach(m => { m.setAttribute("content", dark ? "#0e0f11" : "#ffffff"); m.removeAttribute("media"); });
 }
 applyTheme(getTheme());
