@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ru"><head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -35,7 +35,10 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--text);overflow-x:hidden;overflow-x:clip;max-width:100%}
-html{touch-action:pan-y;-webkit-text-size-adjust:100%}
+html{touch-action:pan-y;-webkit-text-size-adjust:100%;overscroll-behavior:none}
+body{overscroll-behavior:none;touch-action:pan-y}
+input,select,textarea{font-size:16px}
+.top,.tabs,.timerbar{touch-action:none}
 body{font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-text-size-adjust:100%;overflow-x:hidden}
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 input{font:inherit;color:inherit}
@@ -75,7 +78,7 @@ main{padding:14px 0 110px}
 .metric label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
 .field{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card2);font-size:20px;font-weight:600;outline:none;min-width:0}
 .field:focus{border-color:var(--calm);background:var(--card)}
-.field.sm{font-size:15px;font-weight:500;padding:8px 10px}
+.field.sm{font-size:16px;font-weight:500;padding:8px 10px}
 .field.bad{border-color:var(--fast)}
 .hint{font-size:12px;color:var(--muted);margin-top:6px}
 .bar{height:8px;border-radius:99px;background:var(--card2);overflow:hidden;margin-top:8px}
@@ -168,7 +171,7 @@ h2.stp{font-size:16px;margin-bottom:10px}
 .chk{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line);font-size:14px;cursor:pointer}
 .chk input{width:20px;height:20px;margin:0;flex:none;accent-color:var(--ok)}
 .warncard{border-color:var(--fast);background:var(--fast-soft)} .warncard h2{color:var(--fast)}
-.addrow{margin-top:10px} select.field{appearance:auto;font-size:15px}
+.addrow{margin-top:10px} select.field{appearance:auto;font-size:16px}
 .hlink{font-size:12px;font-weight:600;color:var(--muted);text-decoration:underline;padding:5px 2px;margin-top:8px}
 .terms p{margin:0 0 10px;font-size:14px;line-height:1.5}
 .hbtn{margin-top:8px;font-size:12px;font-weight:600;padding:5px 9px;border-radius:999px;background:var(--fast-soft);color:var(--fast)}
@@ -183,7 +186,7 @@ h2.stp{font-size:16px;margin-bottom:10px}
 .srow .sk{display:block;font-size:13px;color:var(--accent)}
 .srow{flex-wrap:wrap}
 .srow .sn{flex:1 1 100%}
-.srow .sg{flex:1;min-width:0;padding:8px 10px;font-size:15px}
+.srow .sg{flex:1;min-width:0;padding:8px 10px;font-size:16px}
 .srow .sadd{flex:none;width:38px;height:36px;padding:0;font-size:20px}
 .modal{position:fixed;inset:0;z-index:20;background:rgba(10,12,16,.45);display:flex;align-items:flex-end;justify-content:center}
 .modal>div{background:var(--card);width:100%;max-width:680px;max-height:85vh;overflow:auto;border-radius:22px 22px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
