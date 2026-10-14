@@ -653,6 +653,10 @@ function plan(i){
     { k: "t1", name: "Готовка на неделю", task: "Обеды и ужины на следующую неделю: рецепты и граммы во вкладке «Питание»." }] };
 }
 const stepGoal = i => program().steps[weekOf(i)-1] * 1000;
+/* Километры из шагов: длина шага ≈ рост × 0,415 (мужчины) или × 0,413 (женщины). */
+const stepLen = () => (S.profile.height || 175) / 100 * (S.profile.sex === "f" ? 0.413 : 0.415);
+const kmOf = st => st == null ? null : st * stepLen() / 1000;
+const kmTxt = st => st == null ? "—" : num(Math.round(kmOf(st) * 10) / 10, 1) + "\u00a0км";
 function trainDone(i){ const p = plan(i), t = day(i).train || {}; const n = p.items.filter(x => t[x.k]).length; return { n, of: p.items.length, full: n === p.items.length }; }
 
 function meals(i){
@@ -872,7 +876,7 @@ function vToday(){
     <div class="card metric"><label for="f-s">Шаги</label>
       <input id="f-s" class="field" inputmode="numeric" autocomplete="off" placeholder="—" data-f="steps" data-i="${i}" value="${d.steps != null ? d.steps : ""}">
       <div class="bar ${d.steps != null && d.steps < g ? "warn" : ""}"><i style="width:${stepsPct}%"></i></div>
-      <div class="hint">Цель ${int(g)}${d.steps != null ? (d.steps >= g ? " · выполнено" : " · осталось " + int(g - d.steps)) : ""}</div>
+      <div class="hint">${d.steps != null ? "<b>" + kmTxt(d.steps) + "</b> · " : ""}Цель ${int(g)} (${kmTxt(g)})${d.steps != null ? (d.steps >= g ? " · выполнено" : " · осталось " + int(g - d.steps)) : ""}</div>
       ${IS_IOS ? `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button class="hbtn${healthPending() ? " pend" : ""}" data-health>${healthPending() ? "📋 Вставить шаги" : "♥ Из «Здоровья»"}</button><button class="hlink" data-hhelp>Как настроить?</button></div>` : ""}</div>
   </div>
   <button class="card link" data-go="train">
@@ -995,7 +999,7 @@ function vSteps(){
   let sum = 0, cnt = 0, hit = 0;
   const rows = Array.from({ length: 7 }, (_, j) => { const i = first + j, s = day(i).steps;
     if (s != null) { sum += s; cnt++; if (s >= g) hit++; }
-    return `<div class="steprow ${i === t ? "cur" : ""}"><div><div class="dn">${WD[j]}</div><div class="hint" style="margin-top:0">${fmtDate(i)}</div></div>
+    return `<div class="steprow ${i === t ? "cur" : ""}"><div><div class="dn">${WD[j]}</div><div class="hint" style="margin-top:0">${fmtDate(i)}${s != null ? ` · <b>${kmTxt(s)}</b>` : ""}</div></div>
       <input class="field sm" inputmode="numeric" autocomplete="off" placeholder="—" data-f="steps" data-i="${i}" value="${s != null ? s : ""}" aria-label="Шаги ${WD[j]}">
       <span class="ok ${s != null && s >= g ? "on" : ""}">${CHECK}</span></div>`; }).join("");
   const avgs = program().steps.map((gg, k) => { let s = 0, n = 0; for (let j = 0; j < 7; j++) { const v = day(k*7+j).steps; if (v != null) { s += v; n++; } } return { avg: n ? s/n : null, goal: gg*1000 }; });
@@ -1003,11 +1007,11 @@ function vSteps(){
   const bars = avgs.map((a, k) => `<div title="Неделя ${k+1}"><u style="bottom:${a.goal/maxV*100}%"></u>${a.avg != null ? `<i class="${a.avg < a.goal ? "miss" : ""}" style="height:${a.avg/maxV*100}%"></i>` : ""}</div>`).join("");
   return `
   <section class="card">
-    <div class="eyebrow">Неделя ${w} · цель ${int(g)} шагов в день</div>
+    <div class="eyebrow">Неделя ${w} · цель ${int(g)} шагов (${kmTxt(g)}) в день</div>
     <div class="grid4" style="margin-top:10px">
-      <div class="stat"><small>В среднем</small><b>${cnt ? int(sum/cnt) : "—"}</b></div>
+      <div class="stat"><small>В среднем</small><b>${cnt ? int(sum/cnt) : "—"}</b>${cnt ? `<small>${kmTxt(sum/cnt)}</small>` : ""}</div>
       <div class="stat"><small>Дней с целью</small><b>${hit} из 7</b></div>
-      <div class="stat"><small>Всего</small><b>${cnt ? int(sum) : "—"}</b></div>
+      <div class="stat"><small>Всего</small><b>${cnt ? int(sum) : "—"}</b>${cnt ? `<small>${kmTxt(sum)}</small>` : ""}</div>
       <div class="stat"><small>Внесено дней</small><b>${cnt}</b></div>
     </div></section>
   <section class="card">${rows}${IS_IOS ? `<div class="pills" style="margin-top:10px;gap:8px"><button class="btn ${healthPending() ? "" : "sec"}" data-health>${healthPending() ? "📋 Вставить шаги" : "♥ Шаги за сегодня из «Здоровья»"}</button><button class="btn sec" data-hhelp>Как настроить</button></div>` : ""}
@@ -1048,7 +1052,7 @@ function vProgress(){
     const avg = wn ? ws/wn : null, ch = avg != null ? avg - prevAvg : null; if (avg != null) prevAvg = avg;
     rows += `<tr class="${weekOf(clampI(t)) === k+1 ? "cur" : ""}"><td>${k+1}</td><td>${avg != null ? num(avg, 1) : "—"}</td>
       <td style="color:${ch == null ? "inherit" : (program().e.goal === "gain" ? ch >= 0 : ch <= 0) ? "var(--ok)" : "var(--warn)"}">${ch != null ? (ch > 0 ? "+" : ch < 0 ? "−" : "") + num(Math.abs(ch), 1) : "—"}</td>
-      <td>${sn ? int(ss/sn) : "—"}</td><td>${tn} из ${tp}</td></tr>`;
+      <td>${sn ? int(ss/sn) + `<div class="hint" style="margin:0">${kmTxt(ss/sn)}</div>` : "—"}</td><td>${tn} из ${tp}</td></tr>`;
   }
   const weeksPassed = last ? Math.max(1, (last[0]+1)/7) : null;
   return `
