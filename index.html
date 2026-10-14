@@ -1043,7 +1043,7 @@ function vProgress(){
   for (let k = 0; k < 12; k++) {
     let ws = 0, wn = 0, ss = 0, sn = 0, tn = 0, tp = 0;
     for (let j = 0; j < 7; j++) { const i = k*7+j, d = day(i); if (d.weight != null) { ws += d.weight; wn++; } if (d.steps != null) { ss += d.steps; sn++; }
-      if (plan(i).type !== "rest") { if (i <= t) { tp++; planW++; } if (trainDone(i).full) { tn++; doneW++; } } }
+      if (plan(i).type !== "rest") { const full = trainDone(i).full; if (i < t || (i === t && full)) { tp++; planW++; } if (full) { tn++; doneW++; } } }
     if (k*7 > t && !wn && !sn) continue;
     const avg = wn ? ws/wn : null, ch = avg != null ? avg - prevAvg : null; if (avg != null) prevAvg = avg;
     rows += `<tr class="${weekOf(clampI(t)) === k+1 ? "cur" : ""}"><td>${k+1}</td><td>${avg != null ? num(avg, 1) : "—"}</td>
@@ -1054,7 +1054,7 @@ function vProgress(){
   return `
   <section class="card">
     <div class="grid4">
-      <div class="stat"><small>Старт</small><b>${num(sw)} кг</b></div>
+      <button class="stat" data-editsw style="text-align:left"><small>Старт <span style="color:var(--accent)">· изменить</span></small><b>${num(sw)} кг</b></button>
       <div class="stat"><small>Сейчас</small><b>${cur != null ? num(cur) + " кг" : "—"}</b>${last ? `<small>${fmtDate(last[0])}</small>` : ""}</div>
       <div class="stat"><small>Сброшено</small><b style="color:${lost == null ? "inherit" : (program().e.goal === "gain" ? lost <= 0 : lost >= 0) ? "var(--ok)" : "var(--warn)"}">${lost != null ? (lost >= 0 ? "−" : "+") + num(Math.abs(lost), 1) + " кг" : "—"}</b></div>
       <div class="stat"><small>ИМТ</small><b>${num(bmi, 1)}</b><small>норма до 25</small></div>
@@ -1065,7 +1065,7 @@ function vProgress(){
     ${chart}${pts.length ? "" : '<div class="empty">Внесите вес во вкладке «Сегодня», и здесь появится график.</div>'}</section>
   <div class="sec-title">По неделям</div>
   <section class="card"><table class="tbl"><tr><th>Нед.</th><th>Ср. вес</th><th>Изм.</th><th>Шаги</th><th>Тренировки</th></tr>${rows}</table>
-    <div class="hint">Тренировка засчитывается, когда отмечены все её пункты. Выполнено ${doneW} из ${planW} на сегодня.</div></section>
+    <div class="hint">«Тренировки»: сколько сделано из тех, что уже были по плану (силовые, кардио, ходьба). Сегодняшняя добавится, когда отметите все её пункты. Всего: ${doneW} из ${planW}.</div></section>
   <section class="card"><button class="link rowh" data-tab="settings"><span><b>Ваш план, данные и оформление</b><br><span class="hint" style="margin:0">Перенесены в настройки ⚙️</span></span><span class="go" style="margin:0">Открыть →</span></button></section>`;
 }
 
@@ -1200,23 +1200,24 @@ function setupLive(){
   document.getElementById("s-warn").innerHTML = warnCard(list, false);
   document.getElementById("s-ackw").style.display = list.length ? "" : "none";
 }
+function showErr(el, t){ el.textContent = t; toast(t); }
 function saveSetup(){
   const err = document.getElementById("s-err"), r = readSetup(), bad = [];
-  if (r.age > 0 && r.age < 18) { err.textContent = "Приложение предназначено только для взрослых: пользоваться им можно с 18 лет."; return; }
+  if (r.age > 0 && r.age < 18) { showErr(err, "Приложение предназначено только для взрослых: пользоваться им можно с 18 лет."); return; }
   if (!(r.age >= 18 && r.age <= 90)) bad.push("возраст от 18 до 90");
   if (!(r.height >= 120 && r.height <= 230)) bad.push("рост от 120 до 230 см");
   if (!(r.startWeight >= 35 && r.startWeight <= 300)) bad.push("вес от 35 до 300 кг");
   if (!r.d) bad.push("дату старта");
-  if (bad.length) { err.textContent = "Проверьте: " + bad.join(", ") + "."; return; }
+  if (bad.length) { showErr(err, "Проверьте: " + bad.join(", ") + "."); return; }
   const np = { sex: r.sex, age: Math.round(r.age), height: Math.round(r.height), startWeight: Math.round(r.startWeight * 10) / 10, start: ymd(mondayOf(r.d)),
     job: r.job, goal: r.goal, pace: r.pace, levelU: r.levelU, levelL: r.levelL, level: Math.round((r.levelU + r.levelL) / 2), eq: r.eq, eqOther: r.eqOther, healthOther: undefined, place: undefined, health: r.health, ack: r.ack, v: 2 };
   if (r.testPush != null && !Number.isNaN(r.testPush)) np.testPush = Math.round(r.testPush);
   if (r.testPull != null && !Number.isNaN(r.testPull)) np.testPull = Math.round(r.testPull);
   if (r.testSquat != null && !Number.isNaN(r.testSquat)) np.testSquat = Math.round(r.testSquat);
-  if (!r.health.ok && !ILL.some(k => r.health[k]) && !r.health.pregnant && !r.health.bf) { err.textContent = "В пункте 5 отметьте «" + (r.sex === "f" ? "Я здорова" : "Я здоров") + "» или то, что относится к вам."; return; }
-  if (!document.getElementById("s-terms").checked) { err.textContent = "Подтвердите в пункте 6, что вам есть 18 лет и вы принимаете условия."; return; }
+  if (!r.health.ok && !ILL.some(k => r.health[k]) && !r.health.pregnant && !r.health.bf) { showErr(err, "В пункте 5 отметьте «" + (r.sex === "f" ? "Я здорова" : "Я здоров") + "» или то, что относится к вам."); const okb = document.querySelector('[data-h="ok"]'); if (okb) okb.scrollIntoView({ block: "center" }); return; }
+  if (!document.getElementById("s-terms").checked) { showErr(err, "Подтвердите в пункте 6, что вам есть 18 лет и вы принимаете условия."); return; }
   np.terms = ymd(new Date());
-  if (warnings(np).length && !r.ack) { err.textContent = "Отметьте в пункте 5, что проконсультируетесь с врачом."; document.getElementById("s-ackw").scrollIntoView({ block: "center" }); return; }
+  if (warnings(np).length && !r.ack) { showErr(err, "Отметьте в пункте 5, что проконсультируетесь с врачом."); document.getElementById("s-ackw").scrollIntoView({ block: "center" }); return; }
   S.profile = Object.assign({}, S.profile, np); PG = null; MP = null;
   S.setup = false; S.sel = clampI(todayIdx()); S.tab = "today";
   queueSave("profile"); render(); window.scrollTo(0, 0);
@@ -1299,7 +1300,7 @@ async function healthSteps(){
     try { await navigator.clipboard.writeText(""); } catch (e) {}
     return;
   }
-  if (recent) { showModal("Шаги не пришли", '<div class="tip" style="margin-top:0">Похоже, команда «Шаги» ещё не настроена или называется иначе.</div>' + healthHelp()); try { localStorage.removeItem(HASK); } catch (e) {} render(); return; }
+  if (recent) { try { localStorage.removeItem(HASK); } catch (e) {} render(); toast("Шаги не вставились. Нажмите «♥ Из «Здоровья»» ещё раз, а если iPhone спросит про вставку — «Вставить»."); return; }
   try { localStorage.setItem(HASK, String(Date.now())); } catch (e) {}
   render();
   toast("Открываю «Команды». Потом вернитесь и нажмите «📋 Вставить шаги».");
@@ -1622,6 +1623,12 @@ document.addEventListener("click", e => {
       const ti = document.getElementById("fs-t"); item.t = normT(ti && ti.value) || nowT();
       mutDay(S.sel, d => { d.extra = (d.extra || []).concat([item]); }); toast("«" + x.n + "»" + (item.g ? ", " + item.g + " " + unitOf(item) : "") + " — в меню"); const q = document.getElementById("fs-q"); const qv = q ? q.value : "", tv = (document.getElementById("fs-t") || {}).value; render(); const t2 = document.getElementById("fs-t"); if (t2 && tv) t2.value = tv; const q2 = document.getElementById("fs-q"); if (q2) { q2.value = qv; document.getElementById("fs-list").innerHTML = libList(qv); } } return; }
   if (ds.libdel != null) { const l = lib().slice(); l.splice(+ds.libdel, 1); saveLib(l); const q = document.getElementById("fs-q"); const el = document.getElementById("fs-list"); if (el) el.innerHTML = libList(q ? q.value : ""); return; }
+  if (ds.editsw != null) { showModal("Стартовый вес", `<div class="tip" style="margin-top:0">От него считается, сколько вы сбросили.</div>
+      <input id="sw-v" class="field sm" inputmode="decimal" style="margin-top:10px" value="${esc(num(S.profile.startWeight || ""))}"><div class="hint" id="sw-err" style="color:var(--fast)"></div>
+      <div class="pills" style="margin-top:12px"><button class="btn" data-swsave>Сохранить</button></div>`, true); return; }
+  if (ds.swsave != null) { const v = parseNum((document.getElementById("sw-v") || {}).value);
+    if (!(v >= 35 && v <= 300)) { document.getElementById("sw-err").textContent = "Введите вес от 35 до 300 кг"; return; }
+    S.profile = Object.assign({}, S.profile, { startWeight: Math.round(v * 10) / 10 }); PG = null; MP = null; queueSave("profile"); closeModal(); render(); toast("Стартовый вес: " + num(S.profile.startWeight) + " кг"); return; }
   if (ds.tedit) { const [kind, k] = ds.tedit.split(":");
     if (kind === "x") { const x = extraFood(S.sel)[+k]; if (!x) return;
       showModal("Время: " + x.n, `<input type="time" id="te-v" class="field sm" value="${pad2(x.t || nowT())}">
