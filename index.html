@@ -212,6 +212,8 @@ h2.stp{font-size:16px;margin-bottom:10px}
 .srow .sadd{flex:none;width:38px;height:36px;padding:0;font-size:20px}
 .modal{position:fixed;inset:0;z-index:20;background:rgba(10,12,16,.45);display:flex;align-items:flex-end;justify-content:center}
 .modal>div{background:var(--card);width:100%;max-width:680px;max-height:85vh;overflow:auto;border-radius:22px 22px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
+.pill.kp{display:inline-flex;flex-direction:column;align-items:center;gap:0;border-radius:12px;line-height:1.15;padding-top:4px;padding-bottom:4px}
+.pill.kp small{font-size:10.5px;font-weight:600;color:var(--muted)}
 .xbtn{width:28px;height:28px;border-radius:8px;background:var(--card2);color:var(--muted);font-size:18px;line-height:1}
 </style>
 
@@ -711,6 +713,7 @@ function foodTotals(i){
   const ex = extraFood(i); r.kcalPlan += ex.reduce((s, x) => s + (x.kcal || 0), 0);
   const rg = regFood(i); r.kcalPlan += rg.reduce((s, x) => s + (x.kcal || 0), 0);
   r.extra = ex.filter(x => x.done !== false).reduce((s, x) => s + (x.kcal || 0), 0) + rg.filter(x => x.done).reduce((s, x) => s + (x.kcal || 0), 0); r.kcal += r.extra;
+  r.prot += ex.filter(x => x.done !== false).reduce((s, x) => s + (x.prot || 0), 0) + rg.filter(x => x.done).reduce((s, x) => s + (x.prot || 0), 0);
   return r;
 }
 const hasData = i => { const d = day(i); return d.weight != null || d.steps != null || Object.values(d.train || {}).some(Boolean) || Object.values(d.meals || {}).some(Boolean); };
@@ -928,11 +931,11 @@ function vFood(){
       return `<div class="item ${on ? "on" : ""}"><button class="ck ${on ? "on" : ""}" data-rmeal="${x.id}" aria-label="Отметить">${CHECK}</button>
       <div><div class="rowh"><div><button type="button" class="time tbtn" data-tedit="r:${x.id}">${esc(x.t || "Доп.")}</button> <span class="t">${esc(x.n)}${x.g ? `<span class="muted" style="font-weight:500">, ${x.g} ${unitOf(x)}</span>` : ""}</span>
         <div class="hint" style="margin:2px 0 0">🔁 каждый день</div></div>
-      <span style="display:flex;gap:6px;align-items:center"><span class="pill">${int(x.kcal)} ккал</span><button class="xbtn" data-delreg="${x.id}" aria-label="Убрать из меню">×</button></span></div></div></div>`; }
+      <span style="display:flex;gap:6px;align-items:center">${kpill(x)}<button class="xbtn" data-delreg="${x.id}" aria-label="Убрать из меню">×</button></span></div></div></div>`; }
     if (r.ex) { const k = r.k, on = x.done !== false;
       return `<div class="item ${on ? "on" : ""}"><button class="ck ${on ? "on" : ""}" data-xmeal="${k}" aria-label="Отметить">${CHECK}</button>
       <div><div class="rowh"><div><button type="button" class="time tbtn" data-tedit="x:${k}">${esc(x.t || "Доп.")}</button> <span class="t">${esc(x.n)}${x.g ? `<span class="muted" style="font-weight:500">, ${x.g} ${unitOf(x)}</span>` : ""}</span></div>
-      <span style="display:flex;gap:6px;align-items:center"><span class="pill">${int(x.kcal)} ккал</span><button class="xbtn" data-delfood="${k}" aria-label="Убрать из меню">×</button></span></div></div></div>`; }
+      <span style="display:flex;gap:6px;align-items:center">${kpill(x)}<button class="xbtn" data-delfood="${k}" aria-label="Убрать из меню">×</button></span></div></div></div>`; }
     const on = !!c[x.k];
     let body = "";
     if (x.lines) body = `<table class="ing">${x.lines.map(r => `<tr><td>${esc(r[0])}</td><td class="n">${esc(r[1])}</td></tr>`).join("")}</table>`;
@@ -941,7 +944,7 @@ function vFood(){
     if (x.water) body = `<div class="d">${esc(x.sub)}</div>`;
     return `<div class="item ${on ? "on" : ""}"><button class="ck ${x.water ? "wt" : ""} ${on ? "on" : ""}" data-meal="${x.k}" aria-label="Отметить">${CHECK}</button>
       <div><div class="rowh"><div><button type="button" class="time tbtn" data-tedit="m:${x.k}">${esc(x.time)}</button> <span class="t">${esc(x.title)}</span></div>
-      <span style="display:flex;gap:6px;align-items:center">${x.kcal ? `<span class="pill">${x.kcal} ккал</span>` : `<span class="pill w">${x.ml} мл</span>`}<button class="xbtn" data-hidemeal="${x.k}" aria-label="Убрать пункт">×</button></span></div>${body}</div></div>`;
+      <span style="display:flex;gap:6px;align-items:center">${x.kcal ? kpill(x) : `<span class="pill w">${x.ml} мл</span>`}<button class="xbtn" data-hidemeal="${x.k}" aria-label="Убрать пункт">×</button></span></div>${body}</div></div>`;
   }).join("");
   return `
   <section class="card">
@@ -1537,10 +1540,12 @@ function balanceCard(i){
       <b>Тренировка</b><span>${int(b.train)} ккал</span><b>Другая активность</b><span>${int(b.act)} ккал</span></div>
     <div class="hint">Съеденное считается по отмеченным приёмам пищи и добавленной еде. Расход — примерная оценка. В полном покое ваш организм тратит ≈ ${int(b.bmr)} ккал в сутки, ещё около 10% уходит на переваривание еды; эта часть набегает равномерно в течение суток по времени на телефоне. Сверху добавляются шаги и отмеченные тренировки. Шаги на кардио-тренировке уже входят в «Шаги», поэтому за кардио добавляется только надбавка за быстрый темп.</div></section>`;
 }
-const BASE_FOODS = [["Хлеб белый",265],["Батон",260],["Хлеб ржаной",210],["Хлеб цельнозерновой",245],["Лаваш тонкий",275],["Хлебцы",300],["Гречка варёная",110],["Рис варёный",115],["Макароны варёные",140],["Овсянка на воде",88],["Овсянка на молоке",105],["Овсяные хлопья сухие",352],["Гречка сухая",330],["Рис сухой",344],["Макароны сухие",345],["Булгур варёный",83],["Пшённая каша",90],["Манная каша на молоке",98],["Картофель варёный",82],["Картофельное пюре",106],["Картофель жареный",190],["Картофель фри",312],["Кукуруза консервированная",58],["Фасоль консервированная",99],["Горошек зелёный консервированный",40],["Яйцо куриное (1 шт. ≈ 55 г)",157],["Омлет",155],["Яичница",196],["Молоко 2,5%",52,"мл"],["Молоко 3,2%",60,"мл"],["Кефир 1%",40,"мл"],["Кефир 2,5%",50,"мл"],["Ряженка 4%",67,"мл"],["Сливки 10%",118,"мл"],["Йогурт натуральный 2%",60],["Йогурт фруктовый",85],["Творог 0%",70],["Творог 5%",121],["Творог 9%",159],["Сырок глазированный",407],["Сырники",220],["Сметана 15%",160],["Сметана 20%",204],["Сыр твёрдый",360],["Сыр моцарелла",280],["Сыр плавленый",250],["Масло сливочное",748],["Куриная грудка варёная",137],["Куриная грудка сырая",113],["Курица жареная с кожей",210],["Куриное бедро",185],["Котлета куриная",190],["Индейка, филе",115],["Говядина тушёная",230],["Свинина жареная",300],["Фарш говяжий",250],["Котлета жареная",260],["Колбаса варёная",260],["Колбаса копчёная",450],["Сосиски",260],["Ветчина",270],["Бекон",500],["Пельмени",275],["Вареники с картошкой",200],["Минтай",72],["Треска",78],["Лосось",208],["Сельдь солёная",217],["Тунец консервированный",96],["Крабовые палочки",88],["Креветки",95],["Огурец",15],["Помидор",20],["Капуста белокочанная",27],["Капуста тушёная",75],["Морковь",35],["Свёкла",42],["Лук репчатый",41],["Перец болгарский",27],["Кабачок",24],["Баклажан",24],["Брокколи",34],["Цветная капуста",30],["Салат листовой",15],["Шпинат",23],["Шампиньоны",27],["Авокадо",160],["Овощной салат с маслом",100],["Салат «Оливье»",198],["Винегрет",76],["Яблоко",47],["Груша",47],["Банан",95],["Апельсин",43],["Мандарин",38],["Грейпфрут",35],["Киви",47],["Виноград",72],["Персик",45],["Слива",49],["Арбуз",27],["Дыня",35],["Клубника",33],["Черника",44],["Хурма",67],["Ананас",52],["Финики",280],["Курага",240],["Изюм",265],["Грецкие орехи",654],["Миндаль",576],["Арахис",552],["Кешью",600],["Семечки подсолнечника",578],["Арахисовая паста",590],["Сахар",400],["Мёд",329],["Варенье",270],["Шоколад молочный",540],["Шоколад горький",540],["Конфеты шоколадные",500],["Печенье",450],["Пряники",350],["Вафли",530],["Торт",380],["Пирожное",400],["Круассан",406],["Булочка сдобная",340],["Пирожок жареный",290],["Пирожок печёный",250],["Блины",230],["Мороженое пломбир",230],["Зефир",320],["Мармелад",320],["Пицца",270],["Бургер",260],["Шаурма",220],["Хот-дог",250],["Наггетсы",300],["Роллы, суши",150],["Чипсы",540],["Сухарики",400],["Попкорн",400],["Борщ",50],["Щи",35],["Суп куриный с лапшой",50],["Солянка",70],["Плов",180],["Гуляш",150],["Голубцы",120],["Сок апельсиновый",45,"мл"],["Сок яблочный",46,"мл"],["Кола, лимонад",42,"мл"],["Кола без сахара",1,"мл"],["Квас",27,"мл"],["Компот",60,"мл"],["Энергетик",45,"мл"],["Пиво светлое",43,"мл"],["Вино сухое",66,"мл"],["Вино полусладкое",80,"мл"],["Водка",235,"мл"],["Коньяк",240,"мл"],["Кофе с молоком без сахара",30,"мл"],["Капучино",40,"мл"],["Латте",50,"мл"],["Какао на молоке",70,"мл"],["Масло подсолнечное",899],["Масло оливковое",898],["Майонез",630],["Кетчуп",100],["Горчица",140],["Соевый соус",50,"мл"]];
+const BASE_FOODS = [["Хлеб белый",265,null,7.7],["Батон",260,null,7.5],["Хлеб ржаной",210,null,6.6],["Хлеб цельнозерновой",245,null,9],["Лаваш тонкий",275,null,9],["Хлебцы",300,null,11],["Гречка варёная",110,null,4.2],["Рис варёный",115,null,2.4],["Макароны варёные",140,null,5],["Овсянка на воде",88,null,3],["Овсянка на молоке",105,null,3.6],["Овсяные хлопья сухие",352,null,12.3],["Гречка сухая",330,null,12.6],["Рис сухой",344,null,7],["Макароны сухие",345,null,11],["Булгур варёный",83,null,3.1],["Пшённая каша",90,null,3],["Манная каша на молоке",98,null,3],["Картофель варёный",82,null,2],["Картофельное пюре",106,null,2.5],["Картофель жареный",190,null,2.8],["Картофель фри",312,null,3.4],["Кукуруза консервированная",58,null,2.2],["Фасоль консервированная",99,null,6.7],["Горошек зелёный консервированный",40,null,3.1],["Яйцо куриное (1 шт. ≈ 55 г)",157,null,12.7],["Омлет",155,null,9.6],["Яичница",196,null,12.9],["Молоко 2,5%",52,"мл",2.8],["Молоко 3,2%",60,"мл",2.9],["Кефир 1%",40,"мл",3],["Кефир 2,5%",50,"мл",2.9],["Ряженка 4%",67,"мл",2.8],["Сливки 10%",118,"мл",3],["Йогурт натуральный 2%",60,null,4.3],["Йогурт фруктовый",85,null,3.2],["Творог 0%",70,null,16.5],["Творог 5%",121,null,17.2],["Творог 9%",159,null,16.7],["Сырок глазированный",407,null,8.5],["Сырники",220,null,15],["Сметана 15%",160,null,2.6],["Сметана 20%",204,null,2.8],["Сыр твёрдый",360,null,25],["Сыр моцарелла",280,null,22],["Сыр плавленый",250,null,16],["Масло сливочное",748,null,0.5],["Куриная грудка варёная",137,null,29.8],["Куриная грудка сырая",113,null,23.6],["Курица жареная с кожей",210,null,26],["Куриное бедро",185,null,19],["Котлета куриная",190,null,17],["Индейка, филе",115,null,21.6],["Говядина тушёная",230,null,17],["Свинина жареная",300,null,20],["Фарш говяжий",250,null,17],["Котлета жареная",260,null,15],["Колбаса варёная",260,null,12],["Колбаса копчёная",450,null,16],["Сосиски",260,null,11],["Ветчина",270,null,14],["Бекон",500,null,23],["Пельмени",275,null,12],["Вареники с картошкой",200,null,5],["Минтай",72,null,15.9],["Треска",78,null,17.7],["Лосось",208,null,20],["Сельдь солёная",217,null,17],["Тунец консервированный",96,null,23],["Крабовые палочки",88,null,6],["Креветки",95,null,18.9],["Огурец",15,null,0.8],["Помидор",20,null,1.1],["Капуста белокочанная",27,null,1.8],["Капуста тушёная",75,null,2],["Морковь",35,null,1.3],["Свёкла",42,null,1.5],["Лук репчатый",41,null,1.4],["Перец болгарский",27,null,1.3],["Кабачок",24,null,0.6],["Баклажан",24,null,1.2],["Брокколи",34,null,2.8],["Цветная капуста",30,null,2.5],["Салат листовой",15,null,1.2],["Шпинат",23,null,2.9],["Шампиньоны",27,null,4.3],["Авокадо",160,null,2],["Овощной салат с маслом",100,null,1.2],["Салат «Оливье»",198,null,5.5],["Винегрет",76,null,1.6],["Яблоко",47,null,0.4],["Груша",47,null,0.4],["Банан",95,null,1.5],["Апельсин",43,null,0.9],["Мандарин",38,null,0.8],["Грейпфрут",35,null,0.7],["Киви",47,null,1],["Виноград",72,null,0.6],["Персик",45,null,0.9],["Слива",49,null,0.8],["Арбуз",27,null,0.6],["Дыня",35,null,0.6],["Клубника",33,null,0.8],["Черника",44,null,1.1],["Хурма",67,null,0.5],["Ананас",52,null,0.4],["Финики",280,null,2.5],["Курага",240,null,5.2],["Изюм",265,null,2.9],["Грецкие орехи",654,null,15],["Миндаль",576,null,18.6],["Арахис",552,null,26],["Кешью",600,null,18],["Семечки подсолнечника",578,null,20.7],["Арахисовая паста",590,null,25],["Сахар",400,null,0],["Мёд",329,null,0.8],["Варенье",270,null,0.3],["Шоколад молочный",540,null,7],["Шоколад горький",540,null,6.2],["Конфеты шоколадные",500,null,4],["Печенье",450,null,7.5],["Пряники",350,null,5.8],["Вафли",530,null,3.2],["Торт",380,null,4.5],["Пирожное",400,null,5],["Круассан",406,null,8],["Булочка сдобная",340,null,7.5],["Пирожок жареный",290,null,6],["Пирожок печёный",250,null,6.5],["Блины",230,null,6],["Мороженое пломбир",230,null,3.2],["Зефир",320,null,0.8],["Мармелад",320,null,0.1],["Пицца",270,null,11],["Бургер",260,null,13],["Шаурма",220,null,10],["Хот-дог",250,null,10],["Наггетсы",300,null,15],["Роллы, суши",150,null,6],["Чипсы",540,null,6.5],["Сухарики",400,null,11],["Попкорн",400,null,7],["Борщ",50,null,2],["Щи",35,null,1.5],["Суп куриный с лапшой",50,null,3],["Солянка",70,null,4],["Плов",180,null,6],["Гуляш",150,null,12],["Голубцы",120,null,7],["Сок апельсиновый",45,"мл",0.7],["Сок яблочный",46,"мл",0.5],["Кола, лимонад",42,"мл",0],["Кола без сахара",1,"мл",0],["Квас",27,"мл",0.2],["Компот",60,"мл",0.2],["Энергетик",45,"мл",0],["Пиво светлое",43,"мл",0.5],["Вино сухое",66,"мл",0.1],["Вино полусладкое",80,"мл",0.1],["Водка",235,"мл",0],["Коньяк",240,"мл",0],["Кофе с молоком без сахара",30,"мл",1.4],["Капучино",40,"мл",2],["Латте",50,"мл",2],["Какао на молоке",70,"мл",3.4],["Масло подсолнечное",899,null,0],["Масло оливковое",898,null,0],["Майонез",630,null,2.8],["Кетчуп",100,null,1.8],["Горчица",140,null,5.7],["Соевый соус",50,"мл",6]];
 function lib(){ return Array.isArray(S.profile.lib) ? S.profile.lib : []; }
 function saveLib(list){ S.profile = Object.assign({}, S.profile, { lib: list.slice(0, 400) }); queueSave("profile"); }
-function libPut(n, k100, u){ const key = n.toLowerCase(), l = lib().filter(x => x.n.toLowerCase() !== key); l.unshift({ n, k100, u }); saveLib(l); }
+function libPut(n, k100, u, p100){ const key = n.toLowerCase(), l = lib().filter(x => x.n.toLowerCase() !== key); const it = { n, k100, u }; if (p100 != null) it.p100 = p100; l.unshift(it); saveLib(l); }
+const gP = v => v == null ? "" : (v < 10 ? num(Math.round(v * 10) / 10) : int(v));
+const kpill = x => `<span class="pill kp">${int(x.kcal)} ккал${x.prot != null ? `<small>${gP(x.prot)} г белка</small>` : ""}</span>`;
 const unitOf = x => x.u === "мл" ? "мл" : "г";
 function foodPanel(){
   if (S.fpanel === "add") return `<div class="fpanel">
@@ -1548,8 +1553,10 @@ function foodPanel(){
     <div class="grid2" style="margin-top:8px">
       <div><label class="hint" for="af-k" style="display:block;margin:0 0 6px">Ккал на 100 г</label><input id="af-k" class="field sm" inputmode="decimal" placeholder="Есть на упаковке" autocomplete="off"></div>
       <div><label class="hint" for="af-g" style="display:block;margin:0 0 6px">Сколько съели, г</label><input id="af-g" class="field sm" inputmode="numeric" placeholder="Например, 150" autocomplete="off"></div></div>
-    <div style="margin-top:8px"><label class="hint" for="af-t" style="display:block;margin:0 0 6px">Во сколько</label><input id="af-t" class="field sm" type="time" value="${pad2(S.ftime || nowT())}"></div>
-    <div class="calc" id="af-sum">Калорийность порции посчитается сама: граммы × ккал на 100 г.</div>
+    <div class="grid2" style="margin-top:8px">
+      <div><label class="hint" for="af-p" style="display:block;margin:0 0 6px">Белок на 100 г</label><input id="af-p" class="field sm" inputmode="decimal" placeholder="Если знаете" autocomplete="off"></div>
+      <div><label class="hint" for="af-t" style="display:block;margin:0 0 6px">Во сколько</label><input id="af-t" class="field sm" type="time" value="${pad2(S.ftime || nowT())}"></div></div>
+    <div class="calc" id="af-sum">Калории и белок порции посчитаются сами: граммы × значение на 100 г.</div>
     <label class="chk" style="border-top:0"><input type="checkbox" id="af-rep"><span><b>🔁 Добавлять каждый день</b> — с этого дня и дальше. Без галочки добавится только на этот день.</span></label>
     <label class="chk" style="border-top:0;padding-top:0"><input type="checkbox" id="af-save" checked><span>Сохранить в архив, чтобы потом найти через поиск</span></label>
     <div class="pills" style="gap:8px"><button class="btn" data-add="food">Добавить в меню</button><button class="btn sec" data-fpanel="">Закрыть</button><span class="hint" id="af-msg" style="margin:0"></span></div></div>`;
@@ -1562,8 +1569,9 @@ function foodPanel(){
   return "";
 }
 function searchItems(q){
-  const qq = q.trim().toLowerCase(), own = lib().map((x, k) => ({ n: x.n, k100: x.k100, kcal: x.kcal, u: x.u, own: k })),
-    seen = new Set(own.map(x => x.n.toLowerCase())), base = BASE_FOODS.filter(b => !seen.has(b[0].toLowerCase())).map(b => ({ n: b[0], k100: b[1], u: b[2] }));
+  const baseP = {}; BASE_FOODS.forEach(b => { baseP[b[0].toLowerCase()] = b[3]; });
+  const qq = q.trim().toLowerCase(), own = lib().map((x, k) => ({ n: x.n, k100: x.k100, kcal: x.kcal, u: x.u, p100: x.p100 != null ? x.p100 : baseP[x.n.toLowerCase()], prot: x.prot, own: k })),
+    seen = new Set(own.map(x => x.n.toLowerCase())), base = BASE_FOODS.filter(b => !seen.has(b[0].toLowerCase())).map(b => ({ n: b[0], k100: b[1], u: b[2] || undefined, p100: b[3] }));
   const all = own.concat(base);
   if (!qq) return own.slice(0, 40);
   const words = qq.split(/\s+/);
@@ -1575,7 +1583,7 @@ function libList(q){
   if (!q.trim() && !SRCH.length) return '<div class="empty">Начните вводить название: в базе больше 150 продуктов. Ваши собственные продукты тоже будут здесь.</div>';
   if (!SRCH.length) return '<div class="empty">Ничего не нашлось. Добавьте продукт через «+ Добавить продукт в меню».</div>';
   return `${!q.trim() ? '<div class="hint" style="margin:0 0 4px">Ваш архив:</div>' : ""}<div class="srch">${SRCH.map((x, k) => `<div class="srow">
-    <div class="sn"><div>${esc(x.n)}</div><small>${x.k100 != null ? num(x.k100) + " ккал / 100 " + unitOf(x) : int(x.kcal) + " ккал за порцию"}${x.own != null ? " · мой" : ""}</small><b class="sk" id="sk-${k}"></b></div>
+    <div class="sn"><div>${esc(x.n)}</div><small>${x.k100 != null ? num(x.k100) + " ккал" + (x.p100 != null ? " · " + gP(x.p100) + " г белка" : "") + " / 100 " + unitOf(x) : int(x.kcal) + " ккал за порцию"}${x.own != null ? " · мой" : ""}</small><b class="sk" id="sk-${k}"></b></div>
     ${x.k100 != null ? `<input class="field sm sg" id="sg-${k}" inputmode="numeric" placeholder="${unitOf(x) === "мл" ? "Укажите мл" : "Укажите граммы"}" aria-label="Сколько ${unitOf(x)}">` : ""}
     <button class="btn sadd" data-libadd="${k}" aria-label="Добавить в меню">+</button>
     ${x.own != null ? `<button class="xbtn" data-libdel="${x.own}" aria-label="Удалить из архива">×</button>` : ""}</div>`).join("")}</div>`;
@@ -1587,9 +1595,9 @@ document.addEventListener("input", e => {
   keepT(e);
   if (e.target.id === "fs-q") { const el = document.getElementById("fs-list"); if (el) el.innerHTML = libList(e.target.value); }
   if (e.target.classList && e.target.classList.contains("sg")) { const k = +e.target.id.slice(3), x = SRCH[k], g = parseNum(e.target.value), el = document.getElementById("sk-" + k);
-    if (el && x) el.textContent = g > 0 ? "= " + int(x.k100 * g / 100) + " ккал" : ""; }
-  if (e.target.id === "af-k" || e.target.id === "af-g") { const k = parseNum(document.getElementById("af-k").value), g = parseNum(document.getElementById("af-g").value), el = document.getElementById("af-sum");
-    if (el) el.innerHTML = k >= 0 && g > 0 && k != null ? `${int(g)} г × ${num(k)} ккал / 100 г = <b>${int(k * g / 100)} ккал</b>` : "Калорийность порции посчитается сама: граммы × ккал на 100 г."; }
+    if (el && x) el.textContent = g > 0 ? "= " + int(x.k100 * g / 100) + " ккал" + (x.p100 != null ? " · " + gP(x.p100 * g / 100) + " г белка" : "") : ""; }
+  if (e.target.id === "af-k" || e.target.id === "af-g" || e.target.id === "af-p") { const k = parseNum(document.getElementById("af-k").value), g = parseNum(document.getElementById("af-g").value), pp = parseNum(document.getElementById("af-p").value), el = document.getElementById("af-sum");
+    if (el) el.innerHTML = k >= 0 && g > 0 && k != null ? `${int(g)} г × ${num(k)} ккал / 100 г = <b>${int(k * g / 100)} ккал</b>${pp >= 0 && pp != null ? ` · <b>${gP(pp * g / 100)} г белка</b>` : ""}` : "Калории и белок порции посчитаются сами: граммы × значение на 100 г."; }
 });
 function activityCard(i){
   const list = day(i).act || [];
@@ -1608,9 +1616,11 @@ function addFood(){
   if (!nm) { msg.textContent = "Впишите название"; return; }
   if (!(k >= 0 && k < 1000)) { msg.textContent = "Впишите ккал на 100 г"; return; }
   if (!(g > 0 && g < 5000)) { msg.textContent = "Впишите, сколько граммов съели"; return; }
-  if (document.getElementById("af-save").checked) libPut(nm, Math.round(k * 10) / 10);
+  const pp = parseNum(document.getElementById("af-p").value), p100 = pp >= 0 && pp < 100 ? Math.round(pp * 10) / 10 : null;
+  if (document.getElementById("af-save").checked) libPut(nm, Math.round(k * 10) / 10, undefined, p100);
   const t = normT(document.getElementById("af-t") && document.getElementById("af-t").value) || S.ftime || nowT();
   const item = { n: nm, g: Math.round(g), kcal: Math.round(k * g / 100), t, done: false }, every = document.getElementById("af-rep").checked;
+  if (p100 != null) item.prot = Math.round(p100 * g / 10) / 10;
   if (every) addRegular(item); else mutDay(S.sel, d => { d.extra = (d.extra || []).concat([item]); });
   S.fpanel = ""; render();
   toast("«" + nm + "» " + (every ? "добавлен в меню на каждый день." : "добавлен в меню. Отметьте квадратик, когда съедите."));
@@ -1744,7 +1754,7 @@ document.addEventListener("click", e => {
   if (ds.xmeal != null) { const k = +ds.xmeal; mutDay(S.sel, d => { const x = (d.extra || [])[k]; if (x) x.done = x.done === false; }); render(); return; }
   if (ds.libadd != null) { const k = +ds.libadd, x = SRCH[k]; if (x) { let item;
       if (x.k100 != null) { const gi = document.getElementById("sg-" + k), gv = parseNum(gi && gi.value), g = gv > 0 && gv < 5000 ? Math.round(gv) : 100;
-        item = { n: x.n, g, u: x.u, kcal: Math.round(x.k100 * g / 100), done: false }; }
+        item = { n: x.n, g, u: x.u, kcal: Math.round(x.k100 * g / 100), done: false }; if (x.p100 != null) item.prot = Math.round(x.p100 * g / 10) / 10; }
       else item = { n: x.n, kcal: x.kcal, done: false };
       const ti = document.getElementById("fs-t"); item.t = normT(ti && ti.value) || S.ftime || nowT();
       const every = (document.getElementById("fs-rep") || {}).checked;
