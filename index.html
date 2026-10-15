@@ -135,11 +135,13 @@ summary::after{content:" ▾"} details[open] summary::after{content:" ▴"}
 .steprow .ok:not(.on) svg{opacity:0}
 .steprow.cur .dn{color:var(--accent);font-weight:700}
 
-.bars{display:grid;grid-template-columns:repeat(12,1fr);gap:5px;align-items:end;height:120px;margin-top:10px;position:relative}
+.bars{display:grid;grid-template-columns:repeat(12,1fr);gap:5px;align-items:end;height:140px;margin-top:10px;position:relative}
 .bars div{display:flex;flex-direction:column;justify-content:flex-end;height:100%;position:relative}
 .bars i{display:block;background:var(--ok);border-radius:5px 5px 2px 2px;min-height:2px}
 .bars i.miss{background:var(--warn)}
-.bars .bv{position:relative;z-index:1;align-self:center;padding:0 3px;border-radius:4px;background:var(--card);font-size:10px;font-weight:700;color:var(--muted);text-align:center;margin-bottom:2px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.bars.dense .bv{font-size:8.5px;letter-spacing:-.04em;padding:0 1px}
+.bars .bv em{display:block;font-style:normal;font-weight:600;color:var(--accent)}
+.bars .bv{line-height:1.15;position:relative;z-index:1;align-self:center;padding:0 3px;border-radius:4px;background:var(--card);font-size:10px;font-weight:700;color:var(--muted);text-align:center;margin-bottom:2px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .bars u{position:absolute;left:-2px;right:-2px;border-top:2px dashed var(--muted);text-decoration:none}
 .bars + .lbl{display:grid;grid-template-columns:repeat(12,1fr);gap:5px;font-size:11px;color:var(--muted);text-align:center;margin-top:4px}
 svg.chart{width:100%;height:auto;display:block}
@@ -1033,7 +1035,7 @@ function vSteps(){
 /* График шагов: по дням выбранной недели, по неделям программы или по месяцам. */
 const MSHORT = ["янв","фев","мар","апр","май","июн","июл","авг","сен","окт","ноя","дек"];
 function stepsChart(){
-  let mode = "weeks"; try { mode = localStorage.getItem("pp_chart") || "weeks"; } catch (e) {}
+  let mode = "weeks", unit = "steps"; try { mode = localStorage.getItem("pp_chart") || "weeks"; unit = localStorage.getItem("pp_chartu") || "steps"; } catch (e) {}
   const P = program(), goalOf = i => P.steps[weekOf(i) - 1] * 1000, t = todayIdx();
   const avgOf = idx => { let s = 0, n = 0, g = 0; idx.forEach(i => { g += goalOf(i); const v = day(i).steps; if (v != null) { s += v; n++; } }); return { avg: n ? s / n : null, goal: idx.length ? g / idx.length : 0, n }; };
   let cols = [], title = "";
@@ -1044,15 +1046,16 @@ function stepsChart(){
     cols = Object.keys(by).sort((a, b) => a - b).map(k => Object.assign(avgOf(by[k]), { l: MSHORT[k % 12], cur: by[k].includes(t) })); title = "Среднее за месяц"; }
   else { cols = P.steps.map((_, k) => Object.assign(avgOf(Array.from({ length: 7 }, (_, j) => k * 7 + j)), { l: String(k + 1), cur: weekOf(clampI(t)) === k + 1 })); title = "Среднее за неделю"; }
   const maxV = Math.max(10000, ...cols.map(c => Math.max(c.avg || 0, c.goal))) * 1.18;
+  const kmS = v => num(Math.round(kmOf(v) * 10) / 10, 1);
   const short = v => v >= 10000 ? num(Math.round(v / 1000), 0) + "к" : num(Math.round(v / 100) / 10, 1) + "к";
-  const n = cols.length, gt = `grid-template-columns:repeat(${n},1fr)`;
-  const bars = cols.map(c => `<div><u style="bottom:${c.goal / maxV * 100}%"></u>${c.avg != null ? `<b class="bv">${short(c.avg)}</b><i class="${c.avg < c.goal ? "miss" : ""}" style="height:${c.avg / maxV * 100}%"></i>` : ""}</div>`).join("");
+  const n = cols.length, gt = `grid-template-columns:repeat(${n},minmax(0,1fr))${n > 7 ? ";gap:2px" : ""}`;
+  const bars = cols.map(c => `<div><u style="bottom:${c.goal / maxV * 100}%"></u>${c.avg != null ? `<b class="bv">${short(c.avg)}<em>${kmS(c.avg)}</em></b><i class="${c.avg < c.goal ? "miss" : ""}" style="height:${c.avg / maxV * 100}%"></i>` : ""}</div>`).join("");
   const withData = cols.filter(c => c.avg != null), all = withData.length ? withData.reduce((s, c) => s + c.avg, 0) / withData.length : null;
   return `<section class="card">
     <div class="seg">${[["days","Дни"],["weeks","Недели"],["months","Месяцы"]].map(([k, l]) => `<button class="${mode === k ? "on" : ""}" data-chart="${k}">${l}</button>`).join("")}</div>
     <div class="rowh" style="margin-top:10px"><span class="hint" style="margin:0">${esc(title)}</span>${all != null ? `<span class="hint" style="margin:0">в среднем <b>${int(all)}</b> · ${kmTxt(all)}</span>` : ""}</div>
-    <div class="bars" style="${gt}">${bars}</div><div class="lbl" style="${gt}">${cols.map(c => `<span style="${c.cur ? "color:var(--accent);font-weight:700" : ""}">${c.l}</span>`).join("")}</div>
-    <div class="hint">${mode === "days" ? "Другую неделю выберите стрелками вверху экрана. " : ""}Пунктир — цель. Зелёный — цель выполнена, оранжевый — ниже цели. Над столбиком — шаги в тысячах.</div></section>`;
+    <div class="bars ${n > 7 ? "dense" : ""}" style="${gt}">${bars}</div><div class="lbl" style="${gt}">${cols.map(c => `<span style="${c.cur ? "color:var(--accent);font-weight:700" : ""}">${c.l}</span>`).join("")}</div>
+    <div class="hint">${mode === "days" ? "Другую неделю выберите стрелками вверху экрана. " : ""}Пунктир — цель. Зелёный — цель выполнена, оранжевый — ниже цели. Над столбиком: сверху шаги в тысячах, под ними <span style="color:var(--accent)">километры</span>.</div></section>`;
 }
 
 function weightSeries(){ const r = []; for (let i = 0; i < DAYS; i++) { const v = day(i).weight; if (v != null) r.push([i, v]); } return r; }
@@ -1694,6 +1697,7 @@ document.addEventListener("click", e => {
     else { const prev = keyAt(S.sel - 1); setReg(id, x => x.from > prev ? null : Object.assign(x, { to: prev })); }
     render(); return; }
   if (ds.chart) { try { localStorage.setItem("pp_chart", ds.chart); } catch (e) {} render(); return; }
+  if (ds.chartu) { try { localStorage.setItem("pp_chartu", ds.chartu); } catch (e) {} render(); return; }
   if (ds.tedit) { const [kind, k] = ds.tedit.split(":");
     if (kind === "r") { const x = regFood(S.sel).find(y => y.id === k); if (!x) return;
       showModal("Время: " + x.n, `<input type="time" id="te-v" class="field sm" value="${pad2(x.t || nowT())}">
