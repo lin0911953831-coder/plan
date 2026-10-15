@@ -145,6 +145,11 @@ summary::after{content:" ▾"} details[open] summary::after{content:" ▴"}
 .bars u{position:absolute;left:-2px;right:-2px;border-top:2px dashed var(--muted);text-decoration:none}
 .bars + .lbl{display:grid;grid-template-columns:repeat(12,1fr);gap:5px;font-size:11px;color:var(--muted);text-align:center;margin-top:4px}
 svg.chart{width:100%;height:auto;display:block}
+svg.chart .hit{cursor:pointer}
+.bars [data-ci]{cursor:pointer}
+.bars .sel i{outline:2px solid var(--text);outline-offset:1px}
+.cinfo{margin-top:8px;padding:9px 12px;border-radius:12px;background:var(--card2);font-size:13.5px;color:var(--muted);min-height:20px}
+.cinfo.on{color:var(--text)}
 .tbl{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
 .tbl th{font-size:12px;color:var(--muted);font-weight:600;text-align:right;padding:6px 4px}
 .tbl td{text-align:right;padding:7px 4px;border-top:1px solid var(--line)}
@@ -1032,6 +1037,37 @@ function vSteps(){
   <div class="sec-title">График шагов</div>
   ${stepsChart()}`;
 }
+const MFULL = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
+/* Группы дней для графиков: неделя по дням, недели программы, календарные месяцы. */
+function chartGroups(mode){
+  const t = todayIdx();
+  if (mode === "days") { const w = weekOf(S.sel), f = (w - 1) * 7;
+    return Array.from({ length: 7 }, (_, j) => ({ idx: [f + j], l: WDS[j], cur: f + j === t, name: WD[j] + ", " + fmtDate(f + j) })); }
+  if (mode === "months") { const by = {};
+    for (let i = 0; i < DAYS; i++) { const d = dateAt(i), k = d.getFullYear() * 12 + d.getMonth(); (by[k] = by[k] || []).push(i); }
+    return Object.keys(by).sort((a, b) => a - b).map(k => ({ idx: by[k], l: MSHORT[k % 12], cur: by[k].includes(t), name: MFULL[k % 12] })); }
+  return Array.from({ length: DAYS / 7 }, (_, k) => ({ idx: Array.from({ length: 7 }, (_, j) => k * 7 + j), l: String(k + 1), cur: weekOf(clampI(t)) === k + 1, name: "Неделя " + (k + 1) + " · " + fmtDate(k * 7) + "–" + fmtDate(k * 7 + 6) }));
+}
+function weightChart(mode, sw){
+  const G = chartGroups(mode).map(g => { let s = 0, n = 0; g.idx.forEach(i => { const v = day(i).weight; if (v != null) { s += v; n++; } }); return Object.assign(g, { v: n ? s / n : null, n }); });
+  const vals = G.filter(g => g.v != null).map(g => g.v).concat([sw]);
+  let lo = Math.floor(Math.min(...vals) - 0.8), hi = Math.ceil(Math.max(...vals) + 0.8); if (hi - lo < 3) lo = hi - 3;
+  const W = 360, H = 200, L = 30, R = 10, T = 22, B = 24, n = G.length;
+  const x = k => L + (k + 0.5) / n * (W - L - R), y = v => T + (hi - v) / (hi - lo) * (H - T - B);
+  let grid = ""; const step = (hi - lo) > 8 ? 2 : 1;
+  for (let v = lo; v <= hi; v += step) grid += `<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)">${v}</text>`;
+  const start = `<line x1="${L}" x2="${W-R}" y1="${y(sw)}" y2="${y(sw)}" stroke="var(--muted)" stroke-dasharray="2 4"/>`;
+  const P = G.map((g, k) => g.v != null ? [x(k), y(g.v)] : null).filter(Boolean);
+  const line = P.length > 1 ? `<polyline fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" points="${P.map(p => p.join(",")).join(" ")}"/>` : "";
+  const fs = n > 7 ? 9 : 11;
+  const pts = G.map((g, k) => { const lab = `<text x="${x(k)}" y="${H-8}" text-anchor="middle" font-size="11" fill="${g.cur ? "var(--accent)" : "var(--muted)"}" font-weight="${g.cur ? 700 : 400}">${g.l}</text>`;
+    if (g.v == null) return lab;
+    const info = g.name + ": <b>" + num(Math.round(g.v * 10) / 10) + " кг</b>" + (mode === "days" ? "" : " в среднем, взвешиваний: " + g.n) + (Math.abs(g.v - sw) >= 0.05 ? " · " + (g.v < sw ? "−" : "+") + num(Math.round(Math.abs(sw - g.v) * 10) / 10) + " кг от старта" : "");
+    return lab + `<text x="${x(k)}" y="${y(g.v) - 9}" text-anchor="middle" font-size="${fs}" font-weight="700" fill="var(--text)">${num(Math.round(g.v * 10) / 10)}</text>
+      <circle cx="${x(k)}" cy="${y(g.v)}" r="4" fill="var(--card)" stroke="var(--accent)" stroke-width="2"/><circle class="hit" cx="${x(k)}" cy="${y(g.v)}" r="13" fill="transparent" data-ci="${esc(info)}"/>`; }).join("");
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="График веса">${grid}${start}${line}${pts}</svg>
+    <div class="hint" style="margin-top:2px">${mode === "days" ? "Неделя " + weekOf(S.sel) + " по дням. Другую неделю выберите стрелками вверху. " : mode === "weeks" ? "Средний вес за каждую неделю. " : "Средний вес за каждый месяц. "}Точечная линия — стартовый вес.</div>`;
+}
 /* График шагов: по дням выбранной недели, по неделям программы или по месяцам. */
 const MSHORT = ["янв","фев","мар","апр","май","июн","июл","авг","сен","окт","ноя","дек"];
 function stepsChart(){
@@ -1049,17 +1085,22 @@ function stepsChart(){
   const kmS = v => num(Math.round(kmOf(v) * 10) / 10, 1);
   const short = v => v >= 10000 ? num(Math.round(v / 1000), 0) + "к" : num(Math.round(v / 100) / 10, 1) + "к";
   const n = cols.length, gt = `grid-template-columns:repeat(${n},minmax(0,1fr))${n > 7 ? ";gap:2px" : ""}`;
-  const bars = cols.map(c => `<div><u style="bottom:${c.goal / maxV * 100}%"></u>${c.avg != null ? `<b class="bv">${short(c.avg)}<em>${kmS(c.avg)}</em></b><i class="${c.avg < c.goal ? "miss" : ""}" style="height:${c.avg / maxV * 100}%"></i>` : ""}</div>`).join("");
+  const G2 = chartGroups(mode);
+  const ci = (c, k) => { const g = G2[k]; if (!g) return ""; const name = g.name;
+    return esc(c.avg == null ? name + ": шаги не внесены" : name + ": <b>" + int(c.avg) + "</b> шагов" + (mode === "days" ? "" : " в среднем") + " · <b>" + kmTxt(c.avg) + "</b> · цель " + int(c.goal) + (c.avg >= c.goal ? " ✓" : " · не хватило " + int(c.goal - c.avg)) + (mode === "days" ? "" : " · дней с данными: " + c.n)); };
+  const bars = cols.map((c, k) => `<div data-ci="${ci(c, k)}"><u style="bottom:${c.goal / maxV * 100}%"></u>${c.avg != null ? `<b class="bv">${short(c.avg)}<em>${kmS(c.avg)}</em></b><i class="${c.avg < c.goal ? "miss" : ""}" style="height:${c.avg / maxV * 100}%"></i>` : ""}</div>`).join("");
   const withData = cols.filter(c => c.avg != null), all = withData.length ? withData.reduce((s, c) => s + c.avg, 0) / withData.length : null;
   return `<section class="card">
     <div class="seg">${[["days","Дни"],["weeks","Недели"],["months","Месяцы"]].map(([k, l]) => `<button class="${mode === k ? "on" : ""}" data-chart="${k}">${l}</button>`).join("")}</div>
     <div class="rowh" style="margin-top:10px"><span class="hint" style="margin:0">${esc(title)}</span>${all != null ? `<span class="hint" style="margin:0">в среднем <b>${int(all)}</b> · ${kmTxt(all)}</span>` : ""}</div>
     <div class="bars ${n > 7 ? "dense" : ""}" style="${gt}">${bars}</div><div class="lbl" style="${gt}">${cols.map(c => `<span style="${c.cur ? "color:var(--accent);font-weight:700" : ""}">${c.l}</span>`).join("")}</div>
+    <div class="cinfo">Нажмите на столбик, чтобы увидеть ${mode === "days" ? "день" : mode === "weeks" ? "неделю" : "месяц"}</div>
     <div class="hint">${mode === "days" ? "Другую неделю выберите стрелками вверху экрана. " : ""}Пунктир — цель. Зелёный — цель выполнена, оранжевый — ниже цели. Над столбиком: сверху шаги в тысячах, под ними <span style="color:var(--accent)">километры</span>.</div></section>`;
 }
 
 function weightSeries(){ const r = []; for (let i = 0; i < DAYS; i++) { const v = day(i).weight; if (v != null) r.push([i, v]); } return r; }
 function vProgress(){
+  let wmode = "all"; try { wmode = localStorage.getItem("pp_wchart") || "all"; } catch (e) {}
   const pts = weightSeries(), sw = S.profile.startWeight || pts.length && pts[0][1] || 80, h = (S.profile.height || 175) / 100;
   const last = pts.length ? pts[pts.length-1] : null, cur = last ? last[1] : null;
   const lost = cur != null ? sw - cur : null, bmi = (cur != null ? cur : sw) / (h*h);
@@ -1074,7 +1115,7 @@ function vProgress(){
   const goalLine = `<line x1="${x(0)}" y1="${y(sw)}" x2="${x(DAYS-1)}" y2="${y(sw - 12*0.75)}" stroke="var(--accent)" stroke-dasharray="4 5" opacity=".55"/>`;
   const startLine = `<line x1="${L}" x2="${W-R}" y1="${y(sw)}" y2="${y(sw)}" stroke="var(--muted)" stroke-dasharray="2 4"/>`;
   const line = pts.length > 1 ? `<polyline fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" points="${pts.map(p => x(p[0])+","+y(p[1])).join(" ")}"/>` : "";
-  const dots = pts.map(p => `<circle cx="${x(p[0])}" cy="${y(p[1])}" r="3.5" fill="var(--card)" stroke="var(--accent)" stroke-width="2"/>`).join("");
+  const dots = pts.map(p => `<circle cx="${x(p[0])}" cy="${y(p[1])}" r="3.5" fill="var(--card)" stroke="var(--accent)" stroke-width="2"/><circle class="hit" cx="${x(p[0])}" cy="${y(p[1])}" r="11" fill="transparent" data-ci="${esc(WD[p[0] % 7] + ", " + fmtDate(p[0]) + ": <b>" + num(p[1]) + " кг</b>" + (p[1] !== sw ? " · " + (p[1] < sw ? "−" : "+") + num(Math.abs(Math.round((sw - p[1]) * 10) / 10)) + " кг от старта" : ""))}"/>`).join("");
   const chart = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="График веса"><defs><clipPath id="pc"><rect x="${L}" y="${T}" width="${W-L-R}" height="${H-T-B}"/></clipPath></defs>${grid}${startLine}<g clip-path="url(#pc)">${goalLine}</g>${line}${dots}</svg>`;
   // weeks
   const t = todayIdx(); let prevAvg = sw, rows = "", doneW = 0, planW = 0;
@@ -1099,8 +1140,10 @@ function vProgress(){
     </div>
     ${lost != null && weeksPassed ? `<div class="hint">Темп: ${num(lost/weeksPassed, 1)} кг в неделю. Норма 0,5–1 кг; в первую неделю больше за счёт воды.</div>` : ""}
   </section>
-  <section class="card"><div class="rowh"><h2 style="font-size:16px">Вес</h2><span class="hint" style="margin:0">пунктир: темп −0,75 кг/нед</span></div>
-    ${chart}${pts.length ? "" : '<div class="empty">Внесите вес во вкладке «Сегодня», и здесь появится график.</div>'}</section>
+  <section class="card"><div class="rowh"><h2 style="font-size:16px">Вес</h2>${wmode === "all" ? '<span class="hint" style="margin:0">пунктир: темп −0,75 кг/нед</span>' : ""}</div>
+    <div class="seg" style="margin-top:10px">${[["days","Дни"],["weeks","Недели"],["months","Месяцы"],["all","Всё"]].map(([k, l]) => `<button class="${wmode === k ? "on" : ""}" data-wchart="${k}">${l}</button>`).join("")}</div>
+    ${wmode === "all" ? chart : weightChart(wmode, sw)}
+    ${pts.length ? '<div class="cinfo">Нажмите на точку, чтобы увидеть день</div>' : '<div class="empty">Внесите вес во вкладке «Сегодня», и здесь появится график.</div>'}</section>
   <div class="sec-title">По неделям</div>
   <section class="card"><table class="tbl"><tr><th>Нед.</th><th>Ср. вес</th><th>Изм.</th><th>Шаги</th><th>Тренировки</th></tr>${rows}</table>
     <div class="hint">«Тренировки»: сколько сделано из тех, что уже были по плану (силовые, кардио, ходьба). Сегодняшняя добавится, когда отметите все её пункты. Всего: ${doneW} из ${planW}.</div></section>
@@ -1723,6 +1766,7 @@ document.addEventListener("click", e => {
     else { const prev = keyAt(S.sel - 1); setReg(id, x => x.from > prev ? null : Object.assign(x, { to: prev })); }
     render(); return; }
   if (ds.chart) { try { localStorage.setItem("pp_chart", ds.chart); } catch (e) {} render(); return; }
+  if (ds.wchart) { try { localStorage.setItem("pp_wchart", ds.wchart); } catch (e) {} render(); return; }
   if (ds.chartu) { try { localStorage.setItem("pp_chartu", ds.chartu); } catch (e) {} render(); return; }
   if (ds.tedit) { const [kind, k] = ds.tedit.split(":");
     if (kind === "r") { const x = regFood(S.sel).find(y => y.id === k); if (!x) return;
@@ -1830,6 +1874,15 @@ setTimeout(checkNewDay, 0);
 window.__plan = { program, nutrition, mealPlan, plan, foodTotals, warnings, burned };
 boot();
 })();
+</script>
+
+<script>
+document.addEventListener("click", e => {
+  const t = e.target.closest && e.target.closest("[data-ci]"); if (!t) return;
+  const sec = t.closest("section"), box = sec && sec.querySelector(".cinfo"); if (!box) return;
+  box.innerHTML = t.dataset.ci; box.classList.add("on");
+  sec.querySelectorAll(".bars .sel").forEach(x => x.classList.remove("sel")); if (t.parentNode && t.parentNode.classList && t.parentNode.classList.contains("bars")) t.classList.add("sel");
+});
 </script>
 
 </body></html>
