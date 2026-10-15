@@ -701,7 +701,8 @@ function foodTotals(i){
   m.forEach(x => { r.kcalPlan += x.kcal || 0; r.protPlan += x.prot || 0; r.mlPlan += x.ml || 0;
     if (c[x.k]) { r.kcal += x.kcal || 0; r.prot += x.prot || 0; r.ml += x.ml || 0; } });
   const ex = extraFood(i); r.kcalPlan += ex.reduce((s, x) => s + (x.kcal || 0), 0);
-  r.extra = ex.filter(x => x.done !== false).reduce((s, x) => s + (x.kcal || 0), 0); r.kcal += r.extra;
+  const rg = regFood(i); r.kcalPlan += rg.reduce((s, x) => s + (x.kcal || 0), 0);
+  r.extra = ex.filter(x => x.done !== false).reduce((s, x) => s + (x.kcal || 0), 0) + rg.filter(x => x.done).reduce((s, x) => s + (x.kcal || 0), 0); r.kcal += r.extra;
   return r;
 }
 const hasData = i => { const d = day(i); return d.weight != null || d.steps != null || Object.values(d.train || {}).some(Boolean) || Object.values(d.meals || {}).some(Boolean); };
@@ -912,8 +913,14 @@ function vFood(){
   let prevKey = 0;
   const rows = m.map((x, n) => { const kk = tkey(x.time); prevKey = kk == null ? prevKey : kk; return { x, key: prevKey, n }; })
     .concat(extraFood(i).map((x, k) => ({ x, ex: true, k, key: x.t ? tkey(x.t) : 24 * 60, n: 1000 + k })))
+    .concat(regFood(i).map((x, k) => ({ x, rg: true, key: x.t ? tkey(x.t) : 24 * 60, n: 500 + k })))
     .sort((a, b) => a.key - b.key || a.n - b.n);
   const items = rows.map(r => { const x = r.x;
+    if (r.rg) { const on = x.done;
+      return `<div class="item ${on ? "on" : ""}"><button class="ck ${on ? "on" : ""}" data-rmeal="${x.id}" aria-label="Отметить">${CHECK}</button>
+      <div><div class="rowh"><div><button type="button" class="time tbtn" data-tedit="r:${x.id}">${esc(x.t || "Доп.")}</button> <span class="t">${esc(x.n)}${x.g ? `<span class="muted" style="font-weight:500">, ${x.g} ${unitOf(x)}</span>` : ""}</span>
+        <div class="hint" style="margin:2px 0 0">🔁 каждый день</div></div>
+      <span style="display:flex;gap:6px;align-items:center"><span class="pill">${int(x.kcal)} ккал</span><button class="xbtn" data-delreg="${x.id}" aria-label="Убрать из меню">×</button></span></div></div></div>`; }
     if (r.ex) { const k = r.k, on = x.done !== false;
       return `<div class="item ${on ? "on" : ""}"><button class="ck ${on ? "on" : ""}" data-xmeal="${k}" aria-label="Отметить">${CHECK}</button>
       <div><div class="rowh"><div><button type="button" class="time tbtn" data-tedit="x:${k}">${esc(x.t || "Доп.")}</button> <span class="t">${esc(x.n)}${x.g ? `<span class="muted" style="font-weight:500">, ${x.g} ${unitOf(x)}</span>` : ""}</span></div>
@@ -1397,6 +1404,17 @@ const ACTS = [
   ["Баскетбол, волейбол", 6.5], ["Теннис, бадминтон", 6], ["Танцы", 5], ["Скакалка", 11], ["Подъём по лестнице", 8], ["Тренажёрный зал", 5],
   ["Йога, растяжка", 2.5], ["Уборка, работа в саду", 3.5], ["Лыжи, коньки", 7]];
 function extraFood(i){ return (day(i).extra || []); }
+/* Продукты «каждый день»: хранятся в профиле, действуют с дня from (и до to, если убрали с какого-то дня). Отметки — по дням. */
+function regFood(i){
+  const k = keyAt(i), d = day(i), hid = d.regHidden || {}, done = d.regDone || {}, tt = d.regTimes || {};
+  return (S.profile.regular || []).filter(x => x.from <= k && (!x.to || k <= x.to) && !hid[x.id])
+    .map(x => Object.assign({}, x, { done: !!done[x.id], t: tt[x.id] || x.t, dayT: !!tt[x.id] }));
+}
+function addRegular(item){
+  const x = Object.assign({}, item, { id: "r" + Date.now().toString(36), from: keyAt(S.sel) }); delete x.done;
+  S.profile = Object.assign({}, S.profile, { regular: (S.profile.regular || []).concat([x]) }); queueSave("profile");
+}
+function setReg(id, fn){ S.profile = Object.assign({}, S.profile, { regular: (S.profile.regular || []).map(x => x.id === id ? fn(Object.assign({}, x)) : x).filter(Boolean) }); queueSave("profile"); }
 function burned(i){
   const p = prof(), d = day(i), w = d.weight || curWeight(), fem = p.sex === "f";
   const bmr = 10*w + 6.25*(p.height || 175) - 5*(p.age || 30) + (fem ? -161 : 5);
@@ -1439,10 +1457,12 @@ function foodPanel(){
       <div><label class="hint" for="af-g" style="display:block;margin:0 0 6px">Сколько съели, г</label><input id="af-g" class="field sm" inputmode="numeric" placeholder="Например, 150" autocomplete="off"></div></div>
     <div style="margin-top:8px"><label class="hint" for="af-t" style="display:block;margin:0 0 6px">Во сколько</label><input id="af-t" class="field sm" type="time" value="${pad2(nowT())}"></div>
     <div class="calc" id="af-sum">Калорийность порции посчитается сама: граммы × ккал на 100 г.</div>
-    <label class="chk" style="border-top:0"><input type="checkbox" id="af-save" checked><span>Сохранить в архив, чтобы потом найти через поиск</span></label>
+    <label class="chk" style="border-top:0"><input type="checkbox" id="af-rep"><span><b>🔁 Добавлять каждый день</b> — с этого дня и дальше. Без галочки добавится только на этот день.</span></label>
+    <label class="chk" style="border-top:0;padding-top:0"><input type="checkbox" id="af-save" checked><span>Сохранить в архив, чтобы потом найти через поиск</span></label>
     <div class="pills" style="gap:8px"><button class="btn" data-add="food">Добавить в меню</button><button class="btn sec" data-fpanel="">Закрыть</button><span class="hint" id="af-msg" style="margin:0"></span></div></div>`;
   if (S.fpanel === "search") return `<div class="fpanel"><label class="hint" for="fs-q" style="display:block;margin:0 0 6px">Поиск продуктов из архива</label><input id="fs-q" class="field sm" placeholder="Например: хлеб, банан, кефир" autocomplete="off">
     <div style="margin-top:8px;display:flex;align-items:center;gap:8px"><label class="hint" for="fs-t" style="margin:0">Во сколько</label><input id="fs-t" class="field sm" type="time" style="max-width:130px" value="${pad2(nowT())}"></div>
+    <label class="chk" style="border-top:0;padding-bottom:0"><input type="checkbox" id="fs-rep"><span><b>🔁 Добавлять каждый день</b> — с этого дня и дальше</span></label>
     <div class="hint" style="margin-top:6px">У продукта укажите граммы и нажмите «+». Если граммы не указать, добавится 100 г.</div>
     <div id="fs-list" style="margin-top:6px">${libList("")}</div>
     <div class="pills" style="margin-top:8px"><button class="btn sec" data-fpanel="">Закрыть</button></div></div>`;
@@ -1493,8 +1513,10 @@ function addFood(){
   if (!(g > 0 && g < 5000)) { msg.textContent = "Впишите, сколько граммов съели"; return; }
   if (document.getElementById("af-save").checked) libPut(nm, Math.round(k * 10) / 10);
   const t = normT(document.getElementById("af-t") && document.getElementById("af-t").value) || nowT();
-  mutDay(S.sel, d => { d.extra = (d.extra || []).concat([{ n: nm, g: Math.round(g), kcal: Math.round(k * g / 100), t, done: false }]); }); S.fpanel = ""; render();
-  toast("«" + nm + "» добавлен в меню. Отметьте квадратик, когда съедите.");
+  const item = { n: nm, g: Math.round(g), kcal: Math.round(k * g / 100), t, done: false }, every = document.getElementById("af-rep").checked;
+  if (every) addRegular(item); else mutDay(S.sel, d => { d.extra = (d.extra || []).concat([item]); });
+  S.fpanel = ""; render();
+  toast("«" + nm + "» " + (every ? "добавлен в меню на каждый день." : "добавлен в меню. Отметьте квадратик, когда съедите."));
 }
 function addAct(){
   const t = +document.getElementById("aa-t").value, m = parseNum(document.getElementById("aa-m").value), msg = document.getElementById("aa-msg");
@@ -1626,7 +1648,9 @@ document.addEventListener("click", e => {
         item = { n: x.n, g, u: x.u, kcal: Math.round(x.k100 * g / 100), done: false }; }
       else item = { n: x.n, kcal: x.kcal, done: false };
       const ti = document.getElementById("fs-t"); item.t = normT(ti && ti.value) || nowT();
-      mutDay(S.sel, d => { d.extra = (d.extra || []).concat([item]); }); toast("«" + x.n + "»" + (item.g ? ", " + item.g + " " + unitOf(item) : "") + " — в меню"); const q = document.getElementById("fs-q"); const qv = q ? q.value : "", tv = (document.getElementById("fs-t") || {}).value; render(); const t2 = document.getElementById("fs-t"); if (t2 && tv) t2.value = tv; const q2 = document.getElementById("fs-q"); if (q2) { q2.value = qv; document.getElementById("fs-list").innerHTML = libList(qv); } } return; }
+      const every = (document.getElementById("fs-rep") || {}).checked;
+      if (every) addRegular(item); else mutDay(S.sel, d => { d.extra = (d.extra || []).concat([item]); });
+      toast("«" + x.n + "»" + (item.g ? ", " + item.g + " " + unitOf(item) : "") + (every ? " — в меню на каждый день" : " — в меню")); const q = document.getElementById("fs-q"); const qv = q ? q.value : "", tv = (document.getElementById("fs-t") || {}).value, rv = (document.getElementById("fs-rep") || {}).checked; render(); const t2 = document.getElementById("fs-t"); if (t2 && tv) t2.value = tv; const r2 = document.getElementById("fs-rep"); if (r2) r2.checked = !!rv; const q2 = document.getElementById("fs-q"); if (q2) { q2.value = qv; document.getElementById("fs-list").innerHTML = libList(qv); } } return; }
   if (ds.libdel != null) { const l = lib().slice(); l.splice(+ds.libdel, 1); saveLib(l); const q = document.getElementById("fs-q"); const el = document.getElementById("fs-list"); if (el) el.innerHTML = libList(q ? q.value : ""); return; }
   if (ds.editsw != null) { showModal("Стартовый вес", `<div class="tip" style="margin-top:0">От него считается, сколько вы сбросили.</div>
       <input id="sw-v" class="field sm" inputmode="decimal" style="margin-top:10px" value="${esc(num(S.profile.startWeight || ""))}"><div class="hint" id="sw-err" style="color:var(--fast)"></div>
@@ -1634,7 +1658,18 @@ document.addEventListener("click", e => {
   if (ds.swsave != null) { const v = parseNum((document.getElementById("sw-v") || {}).value);
     if (!(v >= 35 && v <= 300)) { document.getElementById("sw-err").textContent = "Введите вес от 35 до 300 кг"; return; }
     S.profile = Object.assign({}, S.profile, { startWeight: Math.round(v * 10) / 10 }); PG = null; MP = null; queueSave("profile"); closeModal(); render(); toast("Стартовый вес: " + num(S.profile.startWeight) + " кг"); return; }
+  if (ds.rmeal) { const id = ds.rmeal; mutDay(S.sel, d => { d.regDone = Object.assign({}, d.regDone || {}); if (d.regDone[id]) delete d.regDone[id]; else d.regDone[id] = true; }); render(); return; }
+  if (ds.delreg) { const id = ds.delreg, x = (S.profile.regular || []).find(y => y.id === id); if (!x) return;
+    showModal("Убрать «" + x.n + "»?", `<div class="tip" style="margin-top:0">Этот продукт добавляется каждый день.</div>
+      <div class="pills" style="margin-top:12px;gap:8px"><button class="btn" data-regdel="day:${id}">Только в этот день</button><button class="btn sec" data-regdel="all:${id}">С этого дня и дальше</button></div>`, true); return; }
+  if (ds.regdel) { const [scope, id] = ds.regdel.split(":"); closeModal();
+    if (scope === "day") mutDay(S.sel, d => { d.regHidden = Object.assign({}, d.regHidden || {}, { [id]: true }); });
+    else { const prev = keyAt(S.sel - 1); setReg(id, x => x.from > prev ? null : Object.assign(x, { to: prev })); }
+    render(); return; }
   if (ds.tedit) { const [kind, k] = ds.tedit.split(":");
+    if (kind === "r") { const x = regFood(S.sel).find(y => y.id === k); if (!x) return;
+      showModal("Время: " + x.n, `<input type="time" id="te-v" class="field sm" value="${pad2(x.t || nowT())}">
+        <div class="pills" style="margin-top:12px;gap:8px"><button class="btn" data-tsave="rday:${k}">Только в этот день</button><button class="btn sec" data-tsave="rall:${k}">Во всех днях</button></div>`, true); return; }
     if (kind === "x") { const x = extraFood(S.sel)[+k]; if (!x) return;
       showModal("Время: " + x.n, `<input type="time" id="te-v" class="field sm" value="${pad2(x.t || nowT())}">
         <div class="pills" style="margin-top:12px;gap:8px"><button class="btn" data-tsave="x:${k}">Сохранить</button></div>`, true); return; }
@@ -1646,6 +1681,8 @@ document.addEventListener("click", e => {
     if (scope === "reset") { mutDay(S.sel, d => { if (d.times) delete d.times[k]; }); const pt = Object.assign({}, S.profile.mealTimes || {}); delete pt[k]; S.profile = Object.assign({}, S.profile, { mealTimes: pt }); queueSave("profile"); closeModal(); render(); return; }
     if (!t) return;
     if (scope === "x") mutDay(S.sel, d => { const x = (d.extra || [])[+k]; if (x) x.t = t; });
+    else if (scope === "rday") mutDay(S.sel, d => { d.regTimes = Object.assign({}, d.regTimes || {}, { [k]: t }); });
+    else if (scope === "rall") { mutDay(S.sel, d => { if (d.regTimes) delete d.regTimes[k]; }); setReg(k, x => Object.assign(x, { t })); }
     else if (scope === "day") mutDay(S.sel, d => { d.times = Object.assign({}, d.times || {}, { [k]: t }); });
     else { mutDay(S.sel, d => { if (d.times) delete d.times[k]; }); S.profile = Object.assign({}, S.profile, { mealTimes: Object.assign({}, S.profile.mealTimes || {}, { [k]: t }) }); queueSave("profile"); }
     closeModal(); render(); toast("Время: " + t); return; }
