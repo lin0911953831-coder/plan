@@ -1455,13 +1455,13 @@ function foodPanel(){
     <div class="grid2" style="margin-top:8px">
       <div><label class="hint" for="af-k" style="display:block;margin:0 0 6px">Ккал на 100 г</label><input id="af-k" class="field sm" inputmode="decimal" placeholder="Есть на упаковке" autocomplete="off"></div>
       <div><label class="hint" for="af-g" style="display:block;margin:0 0 6px">Сколько съели, г</label><input id="af-g" class="field sm" inputmode="numeric" placeholder="Например, 150" autocomplete="off"></div></div>
-    <div style="margin-top:8px"><label class="hint" for="af-t" style="display:block;margin:0 0 6px">Во сколько</label><input id="af-t" class="field sm" type="time" value="${pad2(nowT())}"></div>
+    <div style="margin-top:8px"><label class="hint" for="af-t" style="display:block;margin:0 0 6px">Во сколько</label><input id="af-t" class="field sm" type="time" value="${pad2(S.ftime || nowT())}"></div>
     <div class="calc" id="af-sum">Калорийность порции посчитается сама: граммы × ккал на 100 г.</div>
     <label class="chk" style="border-top:0"><input type="checkbox" id="af-rep"><span><b>🔁 Добавлять каждый день</b> — с этого дня и дальше. Без галочки добавится только на этот день.</span></label>
     <label class="chk" style="border-top:0;padding-top:0"><input type="checkbox" id="af-save" checked><span>Сохранить в архив, чтобы потом найти через поиск</span></label>
     <div class="pills" style="gap:8px"><button class="btn" data-add="food">Добавить в меню</button><button class="btn sec" data-fpanel="">Закрыть</button><span class="hint" id="af-msg" style="margin:0"></span></div></div>`;
   if (S.fpanel === "search") return `<div class="fpanel"><label class="hint" for="fs-q" style="display:block;margin:0 0 6px">Поиск продуктов из архива</label><input id="fs-q" class="field sm" placeholder="Например: хлеб, банан, кефир" autocomplete="off">
-    <div style="margin-top:8px;display:flex;align-items:center;gap:8px"><label class="hint" for="fs-t" style="margin:0">Во сколько</label><input id="fs-t" class="field sm" type="time" style="max-width:130px" value="${pad2(nowT())}"></div>
+    <div style="margin-top:8px;display:flex;align-items:center;gap:8px"><label class="hint" for="fs-t" style="margin:0">Во сколько</label><input id="fs-t" class="field sm" type="time" style="max-width:130px" value="${pad2(S.ftime || nowT())}"></div>
     <label class="chk" style="border-top:0;padding-bottom:0"><input type="checkbox" id="fs-rep"><span><b>🔁 Добавлять каждый день</b> — с этого дня и дальше</span></label>
     <div class="hint" style="margin-top:6px">У продукта укажите граммы и нажмите «+». Если граммы не указать, добавится 100 г.</div>
     <div id="fs-list" style="margin-top:6px">${libList("")}</div>
@@ -1487,7 +1487,10 @@ function libList(q){
     <button class="btn sadd" data-libadd="${k}" aria-label="Добавить в меню">+</button>
     ${x.own != null ? `<button class="xbtn" data-libdel="${x.own}" aria-label="Удалить из архива">×</button>` : ""}</div>`).join("")}</div>`;
 }
+const keepT = e => { if (e.target.id === "af-t" || e.target.id === "fs-t") { const t = normT(e.target.value); if (t) S.ftime = t; } };
+document.addEventListener("change", keepT); document.addEventListener("blur", keepT, true);
 document.addEventListener("input", e => {
+  keepT(e);
   if (e.target.id === "fs-q") { const el = document.getElementById("fs-list"); if (el) el.innerHTML = libList(e.target.value); }
   if (e.target.classList && e.target.classList.contains("sg")) { const k = +e.target.id.slice(3), x = SRCH[k], g = parseNum(e.target.value), el = document.getElementById("sk-" + k);
     if (el && x) el.textContent = g > 0 ? "= " + int(x.k100 * g / 100) + " ккал" : ""; }
@@ -1512,7 +1515,7 @@ function addFood(){
   if (!(k >= 0 && k < 1000)) { msg.textContent = "Впишите ккал на 100 г"; return; }
   if (!(g > 0 && g < 5000)) { msg.textContent = "Впишите, сколько граммов съели"; return; }
   if (document.getElementById("af-save").checked) libPut(nm, Math.round(k * 10) / 10);
-  const t = normT(document.getElementById("af-t") && document.getElementById("af-t").value) || nowT();
+  const t = normT(document.getElementById("af-t") && document.getElementById("af-t").value) || S.ftime || nowT();
   const item = { n: nm, g: Math.round(g), kcal: Math.round(k * g / 100), t, done: false }, every = document.getElementById("af-rep").checked;
   if (every) addRegular(item); else mutDay(S.sel, d => { d.extra = (d.extra || []).concat([item]); });
   S.fpanel = ""; render();
@@ -1641,13 +1644,13 @@ document.addEventListener("click", e => {
   if (ds.health != null) { healthSteps(); return; }
   if (ds.add === "food") { addFood(); return; }
   if (ds.add === "act") { addAct(); return; }
-  if (ds.fpanel != null) { S.fpanel = ds.fpanel; render(); const f = document.getElementById(ds.fpanel === "search" ? "fs-q" : "af-n"); if (f) f.focus(); return; }
+  if (ds.fpanel != null) { if (ds.fpanel !== S.fpanel) S.ftime = ""; S.fpanel = ds.fpanel; render(); const f = document.getElementById(ds.fpanel === "search" ? "fs-q" : "af-n"); if (f) f.focus(); return; }
   if (ds.xmeal != null) { const k = +ds.xmeal; mutDay(S.sel, d => { const x = (d.extra || [])[k]; if (x) x.done = x.done === false; }); render(); return; }
   if (ds.libadd != null) { const k = +ds.libadd, x = SRCH[k]; if (x) { let item;
       if (x.k100 != null) { const gi = document.getElementById("sg-" + k), gv = parseNum(gi && gi.value), g = gv > 0 && gv < 5000 ? Math.round(gv) : 100;
         item = { n: x.n, g, u: x.u, kcal: Math.round(x.k100 * g / 100), done: false }; }
       else item = { n: x.n, kcal: x.kcal, done: false };
-      const ti = document.getElementById("fs-t"); item.t = normT(ti && ti.value) || nowT();
+      const ti = document.getElementById("fs-t"); item.t = normT(ti && ti.value) || S.ftime || nowT();
       const every = (document.getElementById("fs-rep") || {}).checked;
       if (every) addRegular(item); else mutDay(S.sel, d => { d.extra = (d.extra || []).concat([item]); });
       toast("«" + x.n + "»" + (item.g ? ", " + item.g + " " + unitOf(item) : "") + (every ? " — в меню на каждый день" : " — в меню")); const q = document.getElementById("fs-q"); const qv = q ? q.value : "", tv = (document.getElementById("fs-t") || {}).value, rv = (document.getElementById("fs-rep") || {}).checked; render(); const t2 = document.getElementById("fs-t"); if (t2 && tv) t2.value = tv; const r2 = document.getElementById("fs-rep"); if (r2) r2.checked = !!rv; const q2 = document.getElementById("fs-q"); if (q2) { q2.value = qv; document.getElementById("fs-list").innerHTML = libList(qv); } } return; }
