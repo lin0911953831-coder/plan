@@ -1628,8 +1628,8 @@ function addFood(){
   if (!nm) { msg.textContent = "Впишите название"; return; }
   if (!(k >= 0 && k < 1000)) { msg.textContent = "Впишите ккал на 100 г"; return; }
   if (!(g > 0 && g < 5000)) { msg.textContent = "Впишите, сколько граммов съели"; return; }
-  const pp = parseNum(document.getElementById("af-p").value), p100 = pp >= 0 && pp < 100 ? Math.round(pp * 10) / 10 : null;
-  const cv = parseNum(document.getElementById("af-c").value), c100 = cv >= 0 && cv <= 100 ? Math.round(cv * 10) / 10 : null;
+  const pp = parseNum(document.getElementById("af-p").value), p100 = pp != null && pp >= 0 && pp < 100 ? Math.round(pp * 10) / 10 : null;
+  const cv = parseNum(document.getElementById("af-c").value), c100 = cv != null && cv >= 0 && cv <= 100 ? Math.round(cv * 10) / 10 : null;
   if (document.getElementById("af-save").checked) libPut(nm, Math.round(k * 10) / 10, undefined, p100, c100);
   const t = normT(document.getElementById("af-t") && document.getElementById("af-t").value) || S.ftime || nowT();
   const item = { n: nm, g: Math.round(g), kcal: Math.round(k * g / 100), t, done: false }, every = document.getElementById("af-rep").checked;
