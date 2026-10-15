@@ -1009,7 +1009,7 @@ function vSteps(){
   let sum = 0, cnt = 0, hit = 0;
   const rows = Array.from({ length: 7 }, (_, j) => { const i = first + j, s = day(i).steps;
     if (s != null) { sum += s; cnt++; if (s >= g) hit++; }
-    return `<div class="steprow ${i === t ? "cur" : ""}"><div><div class="dn">${WD[j]}</div><div class="hint" style="margin-top:0">${fmtDate(i)}${s != null ? ` · <b>${kmTxt(s)}</b>` : ""}</div></div>
+    return `<div class="steprow ${i === t ? "cur" : ""}"><div><div class="dn">${WD[j]}</div><div class="hint" style="margin-top:0">${fmtDate(i)}${s != null ? ` · <b>${kmTxt(s)}</b>` : ""}</div>${IS_IOS && i === t ? `<button class="hbtn${healthPending() ? " pend" : ""}" data-health style="margin-top:6px">${healthPending() ? "📋 Вставить шаги" : "♥ Из «Здоровья»"}</button>` : ""}</div>
       <input class="field sm" inputmode="numeric" autocomplete="off" placeholder="—" data-f="steps" data-i="${i}" value="${s != null ? s : ""}" aria-label="Шаги ${WD[j]}">
       <span class="ok ${s != null && s >= g ? "on" : ""}">${CHECK}</span></div>`; }).join("");
   const avgs = program().steps.map((gg, k) => { let s = 0, n = 0; for (let j = 0; j < 7; j++) { const v = day(k*7+j).steps; if (v != null) { s += v; n++; } } return { avg: n ? s/n : null, goal: gg*1000 }; });
@@ -1024,8 +1024,8 @@ function vSteps(){
       <div class="stat"><small>Всего</small><b>${cnt ? int(sum) : "—"}</b>${cnt ? `<small>${kmTxt(sum)}</small>` : ""}</div>
       <div class="stat"><small>Внесено дней</small><b>${cnt}</b></div>
     </div></section>
-  <section class="card">${rows}${IS_IOS ? `<div class="pills" style="margin-top:10px;gap:8px"><button class="btn ${healthPending() ? "" : "sec"}" data-health>${healthPending() ? "📋 Вставить шаги" : "♥ Шаги за сегодня из «Здоровья»"}</button><button class="btn sec" data-hhelp>Как настроить</button></div>` : ""}
-    <details style="margin-top:10px"><summary>Как подключить «Здоровье» на iPhone</summary>${healthHelp()}</details><div class="hint">Шаги смотрите в приложении телефона или часов и вносите вечером.</div></section>
+  <section class="card">${rows}
+    ${IS_IOS ? `<details style="margin-top:10px"><summary>Как подключить «Здоровье» на iPhone</summary>${healthHelp()}</details>` : ""}<div class="hint">Шаги смотрите в приложении телефона или часов и вносите вечером.</div></section>
   <div class="sec-title">${WD[S.sel%7]}, ${fmtDate(S.sel)}</div>
   ${activityCard(S.sel)}
   ${balanceCard(S.sel)}
@@ -1317,30 +1317,53 @@ function healthHelp(){
     ${step(7, "Проверьте: нажмите ▶ внизу справа", "Разрешите доступ к «Здоровью». Внизу должно появиться число шагов за сегодня. Потом выйдите стрелкой «‹» — команда сохранится сама.")}
   </div>
   <div class="tip"><b>Показывает 0?</b> Откройте «Настройки» → «Здоровье» → «Доступ к данным и устройства» → «Команды» и в блоке <b>«Разрешить чтение приложению «Команды»»</b> включите <b>Шаги</b>.</div>
-  <div class="tip"><b>Каждый день:</b> нажмите «♥ Из «Здоровья»» → откроются «Команды» и скопируют шаги → вернитесь в приложение: проведите пальцем вправо по самому нижнему краю экрана или выйдите на экран «Домой» и нажмите иконку «Здоровое тело» → кнопка станет «📋 Вставить шаги», нажмите её. Если iPhone спросит про вставку, нажмите «Вставить».</div>
+  <div class="tip"><b>Каждый день:</b> нажмите «♥ Из «Здоровья»» → откроются «Команды» и скопируют шаги → вернитесь в приложение: проведите пальцем вправо по самому нижнему краю экрана или выйдите на экран «Домой» и нажмите иконку «Здоровое тело» → кнопка станет «📋 Вставить шаги», нажмите её. Над кнопкой появится маленький пузырь «Вставить» — нажмите его. Если не успели, откроется поле: нажмите на него и выберите «Вставить».</div>
   <div class="tip">Не хотите настраивать — просто посмотрите шаги в приложении «Здоровье» и впишите число в поле «Шаги».</div>`;
 }
 const HASK = "pp_hask";
 const healthAskedAt = () => { try { return +localStorage.getItem(HASK) || 0; } catch (e) { return 0; } };
 const healthPending = () => Date.now() - healthAskedAt() < 15 * 60000;
+/* Шаги из «Здоровья», два шага:
+   1) кнопка запускает команду «Шаги» — она копирует число в буфер;
+   2) после возврата кнопка «Вставить шаги» читает буфер. На iPhone для этого всплывает пузырь «Вставить».
+   Если прочитать не вышло (не нажали пузырь, телефон не дал с первого раза) — ожидание не сбрасываем
+   и сразу показываем поле, куда шаги можно вставить вручную долгим нажатием. */
+const parseSteps = t => { t = (t || "").trim(); const m = /(?:GROM|ШАГИ)\s+([\d\s.,]+?)\s*(\d{4}-\d{2}-\d{2})?\s*$/i.exec(t);
+  const raw = m ? m[1] : /^[\d\s\u00a0.,]+$/.test(t) ? t : null; if (raw == null) return null;
+  const v = parseFloat(raw.replace(/[\s\u00a0]/g, "").replace(",", ".")); return isFinite(v) && v >= 0 && v < 100000 ? Math.round(v) : null; };
+function saveHealthSteps(v){
+  const i = clampI(todayIdx());
+  try { localStorage.removeItem(HASK); } catch (e) {}
+  closeModal(); mutDay(i, d => { d.steps = v; }); S.sel = i; render(); toast("Шаги за " + fmtDate(i) + ": " + int(v) + " · " + kmTxt(v));
+}
+async function readClip(){
+  if (!(navigator.clipboard && navigator.clipboard.readText)) return null;
+  for (let k = 0; k < 2; k++) {
+    try { return await navigator.clipboard.readText(); }
+    catch (e) { if (k === 0) await new Promise(r => setTimeout(r, 200)); }
+  }
+  return null;
+}
+function pasteModal(why){
+  showModal("Вставьте шаги", `<div class="tip" style="margin-top:0">${why}</div>
+    <input id="hp-v" class="field" inputmode="numeric" autocomplete="off" placeholder="Нажмите сюда → «Вставить»" style="margin-top:10px;font-size:20px">
+    <div class="hint" id="hp-err" style="color:var(--fast)"></div>
+    <div class="pills" style="margin-top:12px;gap:8px"><button class="btn" data-hpsave>Сохранить</button><button class="btn sec" data-hrerun>Запустить команду ещё раз</button></div>`, true);
+}
 async function healthSteps(){
-  let txt = "";
-  try { if (navigator.clipboard && navigator.clipboard.readText) txt = await navigator.clipboard.readText(); } catch (e) {}
-  txt = (txt || "").trim();
-  const recent = Date.now() - healthAskedAt() < 15 * 60000;
-  let v = null, i = clampI(todayIdx());
-  const m = /(?:GROM|ШАГИ)\s+([\d\s.,]+?)\s*(\d{4}-\d{2}-\d{2})?\s*$/i.exec(txt);
-  if (m) { v = parseFloat(m[1].replace(/\s/g, "").replace(",", ".")); if (m[2]) i = idxOfKey(m[2]); }
-  else if (recent && /^[\d\s\u00a0.,]+$/.test(txt)) v = parseFloat(txt.replace(/[\s\u00a0]/g, "").replace(",", "."));
-  if (v != null && isFinite(v) && v >= 0 && v < 100000 && i >= 0 && i < DAYS) {
-    try { localStorage.removeItem(HASK); } catch (e) {}
-    v = Math.round(v); mutDay(i, d => { d.steps = v; }); S.sel = i; render(); toast("Шаги за " + fmtDate(i) + ": " + int(v));
-    try { await navigator.clipboard.writeText(""); } catch (e) {}
+  if (healthPending()) {
+    const txt = await readClip(), v = parseSteps(txt);
+    if (v != null) { saveHealthSteps(v); try { await navigator.clipboard.writeText(""); } catch (e) {} return; }
+    pasteModal(txt == null
+      ? "Телефон не дал прочитать буфер. Нажмите на поле ниже, затем «Вставить» — число шагов уже скопировано командой."
+      : "В буфере не число шагов. Если команда отработала, нажмите на поле и выберите «Вставить». Если нет — запустите её ещё раз.");
     return;
   }
-  if (recent) { try { localStorage.removeItem(HASK); } catch (e) {} render(); toast("Шаги не вставились. Нажмите «♥ Из «Здоровья»» ещё раз, а если iPhone спросит про вставку — «Вставить»."); return; }
+  runShortcut();
+}
+function runShortcut(){
   try { localStorage.setItem(HASK, String(Date.now())); } catch (e) {}
-  render();
+  closeModal(); render();
   toast("Открываю «Команды». Потом вернитесь и нажмите «📋 Вставить шаги».");
   setTimeout(() => { location.href = "shortcuts://run-shortcut?name=" + encodeURIComponent(SHORTCUT); }, 600);
 }
@@ -1517,6 +1540,7 @@ function libList(q){
 const keepT = e => { if (e.target.id === "af-t" || e.target.id === "fs-t") { const t = normT(e.target.value); if (t) S.ftime = t; } };
 document.addEventListener("change", keepT); document.addEventListener("blur", keepT, true);
 document.addEventListener("input", e => {
+  if (e.target.id === "hp-v") { const v = parseSteps(e.target.value); if (v != null && /\d{3,}/.test(e.target.value) && e.inputType === "insertFromPaste") { saveHealthSteps(v); return; } }
   keepT(e);
   if (e.target.id === "fs-q") { const el = document.getElementById("fs-list"); if (el) el.innerHTML = libList(e.target.value); }
   if (e.target.classList && e.target.classList.contains("sg")) { const k = +e.target.id.slice(3), x = SRCH[k], g = parseNum(e.target.value), el = document.getElementById("sk-" + k);
@@ -1669,6 +1693,8 @@ document.addEventListener("click", e => {
   if (ds.seg) { b.parentNode.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); setupLive(); return; }
   if (ds.lv) { b.parentNode.querySelectorAll(".lvl").forEach(x => x.classList.toggle("on", x === b)); return; }
   if (ds.health != null) { healthSteps(); return; }
+  if (ds.hpsave != null) { const v = parseSteps((document.getElementById("hp-v") || {}).value); if (v == null) { document.getElementById("hp-err").textContent = "Нужно число шагов"; return; } saveHealthSteps(v); return; }
+  if (ds.hrerun != null) { runShortcut(); return; }
   if (ds.add === "food") { addFood(); return; }
   if (ds.add === "act") { addAct(); return; }
   if (ds.fpanel != null) { if (ds.fpanel !== S.fpanel) S.ftime = ""; S.fpanel = ds.fpanel; render(); const f = document.getElementById(ds.fpanel === "search" ? "fs-q" : "af-n"); if (f) f.focus(); return; }
